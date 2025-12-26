@@ -41,11 +41,17 @@ const Login = ({ onToggleForm }) => {
           setError('Please wait for admin to verify your account');
           return;
         }
-        // Store user data in localStorage
+        
+        // Calculate expiration time (15 days from now)
+        const loginTime = new Date();
+        const expirationTime = new Date(loginTime.getTime() + (15 * 24 * 60 * 60 * 1000)); // 15 days in milliseconds
+        
+        // Store user data in localStorage with expiration
         localStorage.setItem('userToken', data.token || '');
         localStorage.setItem('userData', JSON.stringify(data.user || {}));
         localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('loginTime', new Date().toISOString());
+        localStorage.setItem('loginTime', loginTime.toISOString());
+        localStorage.setItem('loginExpiration', expirationTime.toISOString());
         
         // Redirect to dashboard or main page
         window.location.href = '/dashboard';
@@ -65,10 +71,8 @@ const Login = ({ onToggleForm }) => {
       <div className="w-full max-w-md">
         {/* Logo and Title */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-top-2">
-          <div className="inline-block p-3 bg-red-600 rounded-2xl mb-4 shadow-lg">
-            <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center">
-              <span className="text-3xl font-bold text-red-600">M</span>
-            </div>
+          <div className="inline-block p-2 bg-red-600 rounded-2xl mb-4 shadow-lg">
+            <img src="/madadgaar-logo.jpg" alt="logo" className="w-20 h-20 rounded-2xl" />
           </div>
           <h1 className="text-4xl font-bold text-gradient-red mb-2">Madadgaar</h1>
           <p className="text-gray-600">Partner Portal</p>

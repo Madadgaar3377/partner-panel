@@ -78,7 +78,7 @@ const Signup = ({ onToggleForm }) => {
         setSuccess(true);
         setTimeout(() => {
           onToggleForm(); // Switch to login form
-        }, 2000);
+        }, 1000);
       } else {
         setError(data.message || 'Signup failed. Please try again.');
       }
@@ -95,10 +95,8 @@ const Signup = ({ onToggleForm }) => {
       <div className="w-full max-w-2xl">
         {/* Logo and Title */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-top-2">
-          <div className="inline-block p-3 bg-red-600 rounded-2xl mb-4 shadow-lg">
-            <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center">
-              <span className="text-3xl font-bold text-red-600">M</span>
-            </div>
+          <div className="inline-block p-2 bg-red-600 rounded-2xl mb-4 shadow-lg">
+            <img src="/madadgaar-logo.jpg" alt="logo" className="w-20 h-20 rounded-2xl" />
           </div>
           <h1 className="text-4xl font-bold text-gradient-red mb-2">Madadgaar</h1>
           <p className="text-gray-600">Partner Portal - Create Account</p>

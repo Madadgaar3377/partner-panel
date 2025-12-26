@@ -33,6 +33,7 @@ const Navbar = () => {
     localStorage.removeItem('userData');
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('loginTime');
+    localStorage.removeItem('loginExpiration');
     navigate('/');
   };
 

@@ -41,6 +41,33 @@ const AuthPage = () => {
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const loginExpiration = localStorage.getItem('loginExpiration');
+  
+  // If authenticated but no expiration (old session), force re-login
+  if (isAuthenticated && !loginExpiration) {
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userData');
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('loginTime');
+    return <Navigate to="/" replace />;
+  }
+  
+  // Check if login has expired
+  if (isAuthenticated && loginExpiration) {
+    const expirationDate = new Date(loginExpiration);
+    const currentDate = new Date();
+    
+    if (currentDate > expirationDate) {
+      // Session expired, clear localStorage
+      localStorage.removeItem('userToken');
+      localStorage.removeItem('userData');
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('loginTime');
+      localStorage.removeItem('loginExpiration');
+      return <Navigate to="/" replace />;
+    }
+  }
+  
   return isAuthenticated ? children : <Navigate to="/" replace />;
 };
 

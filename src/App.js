@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import ForgetPassword from './pages/ForgetPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import ProfileView from './pages/ProfileView';
@@ -16,9 +18,14 @@ import InstallmentDetail from './pages/installments/InstallmentDetail';
 // Property
 import PropertyList from './pages/property/PropertyList';
 import CreateProperty from './pages/property/CreateProperty';
+import EditProperty from './pages/property/EditProperty';
+import PropertyDetail from './pages/property/PropertyDetail';
 
 // Loans
 import LoansList from './pages/loans/LoansList';
+import CreateLoan from './pages/loans/CreateLoan';
+import EditLoan from './pages/loans/EditLoan';
+import LoanDetail from './pages/loans/LoanDetail';
 
 // Insurance
 import InsuranceList from './pages/insurance/InsuranceList';
@@ -76,6 +83,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<AuthPage />} />
+        <Route path="/forget-password" element={<ForgetPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         
         {/* Dashboard & Profile */}
         <Route
@@ -163,6 +172,22 @@ function App() {
           }
         />
         <Route
+          path="/property/edit/:id"
+          element={
+            <ProtectedRoute>
+              <EditProperty />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/property/view/:id"
+          element={
+            <ProtectedRoute>
+              <PropertyDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/property/applications"
           element={
             <ProtectedRoute>
@@ -184,7 +209,23 @@ function App() {
           path="/loans/create"
           element={
             <ProtectedRoute>
-              <LoansList />
+              <CreateLoan />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/loans/edit/:id"
+          element={
+            <ProtectedRoute>
+              <EditLoan />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/loans/view/:id"
+          element={
+            <ProtectedRoute>
+              <LoanDetail />
             </ProtectedRoute>
           }
         />

@@ -57,6 +57,10 @@ The **Madadgaar Partner Portal** is a comprehensive web application designed for
 
 ### 🔐 Authentication & Security
 - **Secure Login/Signup** - Email and password authentication
+- **Forgot Password** - OTP-based password recovery system
+  - Request OTP via email
+  - Verify OTP and set new password
+  - Auto-redirect after successful reset
 - **JWT Token Management** - Secure token-based authentication
 - **15-Day Session** - Automatic session expiration after 15 days
 - **Protected Routes** - Route guards for authenticated access
@@ -88,6 +92,37 @@ The **Madadgaar Partner Portal** is a comprehensive web application designed for
 - **Application Tracking** - View and manage customer applications
 - **Status Management** - Approve, reject, or update application status
 
+### 🏠 Property Management
+- **Property Listings** - Comprehensive real estate management
+- **6-Step Creation** - Detailed property information collection:
+  - Basic Information (type, purpose, area)
+  - Pricing & Location (GPS coordinates, installments)
+  - Features & Layout (rooms, floors, amenities)
+  - Community Amenities (gym, pool, mosque, etc.)
+  - Images & Marketing (gallery, descriptions)
+  - Contact Information
+- **Property Types** - House, Flat, Residential Plot, Commercial Plot, Agricultural Land
+- **Purpose Options** - For Sale, For Rent, On Installment
+- **Advanced Filtering** - Search by type, purpose, location
+- **Image Gallery** - Multiple images with carousel navigation
+- **Detailed Views** - Complete property specifications
+- **Location Tracking** - Latitude/longitude coordinates
+- **Nearby Facilities** - Schools, hospitals, shopping malls, transport
+- **Full CRUD** - Create, read, update, delete operations
+
+### 💰 Loan Management
+- **Loan Applications** - Comprehensive loan application system
+- **Multi-Step Forms** - 4-5 step application process based on employment type
+- **Loan Types** - Personal, Business, Home, Car, Education, Startup
+- **Employment Categories** - Salaried, Self-Employed, Startup, Business Owner
+- **Dynamic Fields** - Form adapts to employment type selection
+- **Startup Support** - Specialized fields for startup loan applications
+- **Document Upload** - Multiple document attachments
+- **Application Tracking** - Status monitoring and verification
+- **Advanced Filtering** - Search by name, loan type, employment type
+- **80+ Fields** - Comprehensive applicant information collection
+- **Full CRUD** - Create, read, update, delete loan applications
+
 ### 👤 User Management
 - **Profile View** - Comprehensive user information display
 - **Profile Update** - Edit personal information and profile picture
@@ -98,14 +133,22 @@ The **Madadgaar Partner Portal** is a comprehensive web application designed for
 - **Wallet Balance** - Financial information display
 
 ### 🎨 UI/UX Features
-- **Glass Morphism** - Modern frosted glass effects
-- **Smooth Animations** - Fade-in, slide-in, and hover animations
-- **Gradient Backgrounds** - Beautiful color transitions
-- **Custom Scrollbar** - Styled scrollbar matching theme
-- **Loading States** - Skeleton loaders and spinners
-- **Error Handling** - User-friendly error messages
-- **Success Feedback** - Toast notifications and alerts
-- **Responsive Design** - Mobile-first approach
+- **Glass Morphism** - Frosted glass effects with backdrop blur
+- **Animated Backgrounds** - Floating gradient orbs for depth
+- **Gradient Text** - Eye-catching headings with color gradients
+- **6-Block OTP** - Professional verification interface
+- **Enhanced Buttons** - Scale and transform animations
+- **Modern Inputs** - Rounded corners, focus rings, hover states
+- **Custom Scrollbar** - Styled scrollbar with gradient theme
+- **Smooth Animations** - Fade, slide, scale, bounce, and shake effects
+- **Loading States** - Skeleton loaders and animated spinners
+- **Error Handling** - Shake animations with friendly messages
+- **Success Feedback** - Bounce-in animations and toast notifications
+- **Hover Effects** - Lift, scale, and color transitions
+- **Shadow Layers** - Multi-level shadows for depth
+- **Typography** - Bold gradient headings throughout
+- **Responsive Design** - Mobile-first, adaptive layouts
+- **Performance** - Optimized animations and transitions
 
 ---
 
@@ -142,6 +185,20 @@ npm run build
 ```
 
 ---
+
+## 🆕 Latest Updates (v0.1.5) - Enhanced UI/UX
+
+### Major Design Overhaul
+- ✅ **Glassmorphism Effects** - Frosted glass navbar with backdrop blur
+- ✅ **Gradient Backgrounds** - Animated floating orbs on auth pages
+- ✅ **Enhanced Typography** - Bold gradients on headings and logos
+- ✅ **Modern Inputs** - Rounded corners, hover effects, focus states
+- ✅ **6-Block OTP** - Professional OTP input interface
+- ✅ **Smooth Animations** - Scale, fade, and slide animations throughout
+- ✅ **Better Buttons** - Transform effects and enhanced shadows
+- ✅ **Professional Polish** - Consistent design language
+- ✅ **Mobile Optimized** - Enhanced responsive experience
+- ✅ **Performance** - Optimized transitions and animations
 
 ## 📦 Installation Guide
 
@@ -197,15 +254,29 @@ partner-panel/
 │   ├── pages/
 │   │   ├── Login.jsx           # Login page
 │   │   ├── Signup.jsx          # Registration page
+│   │   ├── ForgetPassword.jsx  # Forgot password (OTP request)
+│   │   ├── ResetPassword.jsx   # Reset password with OTP
 │   │   ├── Dashboard.jsx       # Analytics dashboard
 │   │   ├── Profile.jsx         # Profile edit page
 │   │   ├── ProfileView.jsx     # Profile view page
-│   │   └── installments/
-│   │       ├── InstallmentsList.jsx        # List all plans
-│   │       ├── CreateInstallmentPlan.jsx   # Create new plan
-│   │       ├── EditInstallmentPlan.jsx     # Edit existing plan
-│   │       ├── InstallmentDetail.jsx       # View plan details
-│   │       └── InstallmentRequests.jsx     # Manage applications
+│   │   ├── installments/
+│   │   │   ├── InstallmentsList.jsx        # List all plans
+│   │   │   ├── CreateInstallmentPlan.jsx   # Create new plan
+│   │   │   ├── EditInstallmentPlan.jsx     # Edit existing plan
+│   │   │   ├── InstallmentDetail.jsx       # View plan details
+│   │   │   └── InstallmentRequests.jsx     # Manage applications
+│   │   ├── property/
+│   │   │   ├── PropertyList.jsx           # List all properties
+│   │   │   ├── CreateProperty.jsx         # Create new property
+│   │   │   ├── EditProperty.jsx           # Edit existing property
+│   │   │   └── PropertyDetail.jsx         # View property details
+│   │   ├── loans/
+│   │   │   ├── LoansList.jsx              # List all loan applications
+│   │   │   ├── CreateLoan.jsx             # Create new loan application
+│   │   │   ├── EditLoan.jsx               # Edit existing loan
+│   │   │   └── LoanDetail.jsx             # View loan details
+│   │   └── insurance/
+│   │       └── InsuranceList.jsx          # Insurance management (placeholder)
 │   ├── constants/
 │   │   └── apiUrl.js           # API configuration
 │   ├── App.js                  # Main app with routing
@@ -260,6 +331,40 @@ Content-Type: application/json
   "Address": "Complete address",
   "userType": "partner",
   "userAccess": ["Installments", "Property"]
+}
+```
+
+#### Forgot Password (Request OTP)
+```http
+POST https://api.madadgaar.com.pk/api/forgetPassword
+Content-Type: application/json
+
+{
+  "email": "partner@example.com"
+}
+
+Response:
+{
+  "success": true,
+  "message": "OTP sent to your email"
+}
+```
+
+#### Reset Password (Verify OTP & Set New Password)
+```http
+POST https://api.madadgaar.com.pk/api/newPassword
+Content-Type: application/json
+
+{
+  "email": "partner@example.com",
+  "otp": "542505",
+  "newPassword": "newpassword123"
+}
+
+Response:
+{
+  "success": true,
+  "message": "Password reset successfully"
 }
 ```
 
@@ -359,6 +464,71 @@ DELETE /deleteInstallment/:id
 Authorization: Bearer {token}
 ```
 
+### Property Management Endpoints
+
+#### Get All Properties
+```http
+GET /getAllProperties
+Authorization: Bearer {token}
+
+Response:
+{
+  "success": true,
+  "properties": [...]
+}
+```
+
+#### Create Property
+```http
+POST /createProperty
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "data": {
+    "userId": "...",
+    "name": "Property Name",
+    "purpose": "For Sale",
+    "typeOfProperty": "House",
+    "price": 5000000,
+    "address": "Complete address",
+    ...
+  }
+}
+```
+
+#### Get Single Property
+```http
+GET /getProperty/:id
+Authorization: Bearer {token}
+
+Response:
+{
+  "success": true,
+  "property": { ... }
+}
+```
+
+#### Update Property
+```http
+PUT /updateProperty
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "data": {
+    "_id": "property_id",
+    ...updated fields
+  }
+}
+```
+
+#### Delete Property
+```http
+DELETE /deleteProperty/:id
+Authorization: Bearer {token}
+```
+
 #### Get Application Details
 ```http
 GET /getApplication/:applicationId
@@ -376,6 +546,58 @@ Content-Type: application/json
   "status": "approved",
   "note": "Approved by partner"
 }
+```
+
+### Loan Management Endpoints
+
+#### Get All Loans
+```http
+GET /getAllLoans
+Authorization: Bearer {token}
+
+Response:
+{
+  "success": true,
+  "loans": [...]
+}
+```
+
+#### Create Loan Application
+```http
+POST /createLoanPlan
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "date": "2024-01-15",
+  "loanType": "Personal Loan",
+  "employmentType": "Salaried",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "+92 300 1234567",
+  "city": "Karachi",
+  "netSalary": "50000",
+  "age": "30",
+  "qualification": "Bachelor's",
+  ...
+}
+```
+
+#### Update Loan
+```http
+PUT /updateLoan/:id
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  ...updated fields
+}
+```
+
+#### Delete Loan
+```http
+DELETE /deleteLoan/:id
+Authorization: Bearer {token}
 ```
 
 ---
@@ -485,6 +707,75 @@ if (userAccess.includes('Property')) {
 
 ---
 
+## 🏠 Property Management
+
+### Property Listing System
+
+The property management module provides a complete real estate listing solution:
+
+#### Features Overview
+- **Multi-Type Support** - Houses, flats, plots (residential/commercial), agricultural land
+- **Purpose Options** - For sale, for rent, on installment
+- **Comprehensive Details** - Up to 70+ fields per property
+- **Image Management** - Multiple images with gallery view
+- **Location Services** - GPS coordinates and address mapping
+- **Amenities Tracking** - Community facilities and nearby locations
+
+### Create Property
+
+Multi-step form with 6 steps:
+
+1. **Basic Property Information**
+   - Property name, type, and purpose
+   - Project type and duration
+   - Plot size and area
+   - Plot stage and possession type
+
+2. **Pricing & Location**
+   - Base price and installment details
+   - Advance amount and monthly payments
+   - Complete address
+   - GPS coordinates (latitude/longitude)
+
+3. **Property Features & Layout**
+   - Bedrooms, bathrooms, kitchens
+   - Floors, flooring type, furnished status
+   - Additional rooms (drawing, dining, study, prayer)
+   - Parking space and utilities
+   - Built year and view
+
+4. **Community Amenities**
+   - Community lawn, swimming pool, gym
+   - Mosque, kids play area, medical centre
+   - Day care, BBQ area, community centre
+   - Nearby schools, hospitals, malls
+   - Public transport access
+
+5. **Images & Marketing**
+   - Multiple image upload
+   - Image preview and removal
+   - Property title and description
+   - Marketing content
+
+6. **Contact Information**
+   - Full name, mobile, email
+   - Landline (optional)
+   - Additional messages/notes
+
+### Property Details View
+
+Comprehensive property information display:
+- **Image Gallery** - Carousel with thumbnails
+- **Key Statistics** - Bedrooms, bathrooms, area, floors
+- **Full Description** - Property details and selling points
+- **Room Breakdown** - All room counts and types
+- **Amenities List** - Active community facilities
+- **Nearby Facilities** - Schools, hospitals, transport, etc.
+- **Pricing Information** - Sale price, installments, advance
+- **Contact Details** - Owner/agent information
+
+---
+
 ## 💼 Installment Management
 
 ### Create Installment Plan
@@ -546,6 +837,83 @@ Pending → In Progress → Approved → Completed
     ↓
 Rejected / Cancelled
 ```
+
+---
+
+## 💰 Loan Management
+
+### Loan Application System
+
+The loan management module provides a comprehensive loan application and management solution:
+
+#### Features Overview
+- **Multiple Loan Types** - Personal, Business, Home, Car, Education, Startup
+- **Employment-Based Forms** - Dynamic fields based on employment type
+- **Comprehensive Details** - Up to 80+ fields per loan application
+- **Document Management** - Multiple document uploads
+- **Application Tracking** - Verification status and approval workflow
+
+### Create Loan Application
+
+Multi-step form with 4-5 steps (varies by employment type):
+
+1. **Basic Loan Information**
+   - Date and loan type selection
+   - Employment type (Salaried, Self-Employed, Startup, Business Owner)
+   - User ID (auto-filled from session)
+   - Dynamic form preview based on employment type
+
+2. **Personal Information**
+   - Full name, email, phone, city
+   - Age, qualification
+   - Marital status, dependents
+   - Personal background details
+
+3. **Employment & Financial Details**
+   - Net salary / monthly income (for Salaried/Self-Employed)
+   - Relevant experience
+   - Length of current employment
+   - Other income sources
+   - Residence type and information
+   - Vehicle ownership status
+   - Current consumer loans
+
+4. **Startup-Specific Information** (Only for Startup employment type)
+   - Educational background
+   - Business structure (Sole Proprietorship, Partnership, Private/Public Limited)
+   - Income bracket and composition
+   - Net worth / available capital
+   - Collateral ownership
+   - Equity investment and ownership percentage
+   - Bank financing status
+   - Feasibility report availability
+   - Team size and remuneration details
+
+5. **Additional Information & Documents**
+   - Previous loan history
+   - Tangible assets as collateral
+   - Equity contribution percentage
+   - Guarantors for loan repayment
+   - Document uploads (CNIC, salary slips, bank statements, etc.)
+
+### Loan Details View
+
+Comprehensive loan application display:
+- **Application Summary** - Loan type, employment type, verification status
+- **Personal Information** - Complete applicant details
+- **Financial Information** - Income, expenses, assets
+- **Loan History** - Previous loans and repayment record
+- **Startup Details** - Business-specific information (if applicable)
+- **Documents Gallery** - Uploaded documents with preview
+- **Status Tracking** - Application timeline and current status
+
+### Loan Filtering & Search
+
+Advanced filtering options:
+- **Search** - By applicant name or loan plan ID
+- **Filter by Loan Type** - Personal, Business, Home, Car, Education, Startup
+- **Filter by Employment** - Salaried, Self-Employed, Startup, Business Owner
+- **Statistics Dashboard** - Total loans by category
 
 ---
 
@@ -833,17 +1201,53 @@ For support and queries:
 
 ## 📊 Project Statistics
 
-- **Total Files**: 50+
-- **Total Components**: 20+
-- **Total Lines of Code**: 5000+
-- **API Endpoints**: 15+
-- **Pages**: 12+
+- **Total Files**: 65+
+- **Total Components**: 30+
+- **Total Lines of Code**: 12000+
+- **API Endpoints**: 25+
+- **Pages**: 20+
+- **Property Fields**: 70+
+- **Loan Fields**: 80+
+- **Installment Categories**: 5+
 
 ---
 
 ## 🔄 Version History
 
-### v0.1.2 (Latest)
+### v0.1.5 (Latest) - Enhanced UI/UX Update
+- ✅ **Major UI/UX Overhaul** - Modern, polished interface across all pages
+- ✅ **Enhanced Authentication** - Improved login/signup with gradient backgrounds
+- ✅ **Animated Backgrounds** - Floating gradient orbs for depth
+- ✅ **Better Typography** - Extrabold headings with gradient text effects
+- ✅ **Improved Navbar** - Glassmorphism effect with enhanced dropdowns
+- ✅ **Enhanced Buttons** - Scale animations and better hover effects
+- ✅ **Better Form Inputs** - Rounded corners, hover states, focus rings
+- ✅ **6-Block OTP Input** - Modern OTP verification interface
+- ✅ **Professional Polish** - Consistent spacing, shadows, and transitions
+- ✅ **Mobile-First Design** - Improved responsive experience
+- ✅ **Performance Optimizations** - Smoother animations and transitions
+
+### v0.1.4
+- ✅ Complete loan management system
+- ✅ Multi-step loan application form (4-5 steps)
+- ✅ Loan CRUD operations with filtering
+- ✅ Startup-specific loan fields
+- ✅ Employment type-based dynamic forms
+- ✅ Forgot password feature with OTP
+- ✅ Password reset via email verification
+- ✅ 80+ loan application fields
+
+### v0.1.3
+- ✅ Complete property management system
+- ✅ 6-step property creation form
+- ✅ Property CRUD operations
+- ✅ Image gallery with carousel
+- ✅ Advanced filtering and search
+- ✅ 70+ property fields support
+- ✅ GPS coordinates integration
+- ✅ Community amenities management
+
+### v0.1.2
 - ✅ React 18 compatibility
 - ✅ Recharts integration
 - ✅ Advanced dashboard with charts

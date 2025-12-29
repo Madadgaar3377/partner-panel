@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, FileText, DollarSign, Calendar, TrendingUp, AlertCircle, Eye, Edit, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
+import { PageLoader } from '../../components/Loader';
 import baseApi from '../../constants/apiUrl';
 
 const InstallmentsList = () => {
@@ -87,17 +88,7 @@ const InstallmentsList = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
-        <Navbar />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading installment plans...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageLoader text="Loading installment plans..." />;
   }
 
   return (

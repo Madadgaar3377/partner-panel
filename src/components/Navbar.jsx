@@ -93,33 +93,33 @@ const Navbar = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50">
+    <nav className="bg-white/90 backdrop-blur-lg shadow-lg sticky top-0 z-50 border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/dashboard')}>
-            <div className="p-2 bg-red-600 rounded-lg">
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/dashboard')}>
+            <div className="p-2 bg-gradient-to-br from-red-600 to-red-700 rounded-xl shadow-lg group-hover:shadow-xl transform group-hover:scale-105 transition-all duration-300">
               <span className="text-xl font-bold text-white">M</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gradient-red">Madadgaar</h1>
-              <p className="text-xs text-gray-500 hidden sm:block">Partner Portal</p>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-red-600 to-red-700 bg-clip-text text-transparent">Madadgaar</h1>
+              <p className="text-xs text-gray-500 hidden sm:block font-medium">Partner Portal</p>
             </div>
           </div>
 
           {/* Desktop Menu */}
-          <div className="hidden lg:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-2">
             {/* Dashboard */}
             <button
               onClick={() => navigate('/dashboard')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all transform hover:scale-105 ${
                 isActive('/dashboard')
-                  ? 'bg-red-50 text-red-600'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg'
+                  : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
               <Home className="w-4 h-4" />
-              <span className="font-medium">Dashboard</span>
+              <span className="font-semibold">Dashboard</span>
             </button>
 
             {/* Dynamic Access Menus */}
@@ -131,22 +131,22 @@ const Navbar = () => {
                 <div key={menu.label} className="relative">
                   <button
                     onClick={() => toggleDropdown(menu.label)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all transform hover:scale-105 ${
                       isMenuActive
-                        ? 'bg-red-50 text-red-600'
-                        : 'text-gray-700 hover:bg-gray-50'
+                        ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg'
+                        : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
-                    <span className="font-medium">{menu.label}</span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${
+                    <span className="font-semibold">{menu.label}</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${
                       openDropdown === menu.label ? 'rotate-180' : ''
                     }`} />
                   </button>
 
                   {/* Dropdown */}
                   {openDropdown === menu.label && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 animate-in fade-in slide-in-from-top-2">
+                    <div className="absolute top-full left-0 mt-2 w-52 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2">
                       {menu.items.map((item) => (
                         <button
                           key={item.path}

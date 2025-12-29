@@ -67,20 +67,25 @@ const Login = ({ onToggleForm }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Decoration */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-red-200 rounded-full opacity-20 blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-red-300 rounded-full opacity-20 blur-3xl animate-pulse delay-1000"></div>
+      
+      <div className="w-full max-w-md relative z-10">
         {/* Logo and Title */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-top-2">
-          <div className="inline-block p-2 bg-red-600 rounded-2xl mb-4 shadow-lg">
-            <img src="/madadgaar-logo.jpg" alt="logo" className="w-20 h-20 rounded-2xl" />
+          <div className="inline-block p-2 bg-gradient-to-br from-red-600 to-red-700 rounded-2xl mb-4 shadow-2xl transform hover:scale-105 transition-transform duration-300">
+            <img src="/madadgaar-logo.jpg" alt="logo" className="w-20 h-20 rounded-xl object-cover" />
           </div>
-          <h1 className="text-4xl font-bold text-gradient-red mb-2">Madadgaar</h1>
-          <p className="text-gray-600">Partner Portal</p>
+          <h1 className="text-5xl font-extrabold bg-gradient-to-r from-red-600 to-red-700 bg-clip-text text-transparent mb-2">Madadgaar</h1>
+          <p className="text-gray-600 font-medium text-lg">Partner Portal</p>
         </div>
 
         {/* Login Form */}
-        <div className="glass-red rounded-2xl shadow-2xl p-8 animate-in fade-in slide-in-from-right-4">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Welcome Back</h2>
+        <div className="glass-red rounded-3xl shadow-2xl p-8 animate-in fade-in slide-in-from-right-4 border border-white/50 backdrop-blur-xl">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h2>
+          <p className="text-gray-600 mb-6">Login to access your partner dashboard</p>
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 animate-in fade-in">
@@ -92,18 +97,18 @@ const Login = ({ onToggleForm }) => {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Email Address
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className="relative group">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-hover:text-red-500 transition-colors" />
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-white border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 hover:border-gray-400 outline-none transition-all"
                   placeholder="partner@example.com"
                 />
               </div>
@@ -111,24 +116,32 @@ const Login = ({ onToggleForm }) => {
 
             {/* Password Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Password
+                </label>
+                <a
+                  href="/forget-password"
+                  className="text-xs text-red-600 hover:text-red-700 font-bold transition-colors hover:underline"
+                >
+                  Forgot Password?
+                </a>
+              </div>
+              <div className="relative group">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-hover:text-red-500 transition-colors" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                  className="w-full pl-10 pr-12 py-3 bg-white border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 hover:border-gray-400 outline-none transition-all"
                   placeholder="Enter your password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-600 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -139,7 +152,7 @@ const Login = ({ onToggleForm }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white py-3 rounded-lg font-semibold hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white py-3.5 rounded-xl font-bold hover:from-red-700 hover:to-red-800 transition-all shadow-lg hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -147,7 +160,7 @@ const Login = ({ onToggleForm }) => {
                   Logging in...
                 </span>
               ) : (
-                'Login'
+                'Login to Dashboard'
               )}
             </button>
           </form>
@@ -158,18 +171,23 @@ const Login = ({ onToggleForm }) => {
               Don't have an account?{' '}
               <button
                 onClick={onToggleForm}
-                className="text-red-600 hover:text-red-700 font-semibold transition-colors"
+                className="text-red-600 hover:text-red-700 font-bold transition-colors hover:underline"
               >
-                Sign Up
+                Sign Up Now
               </button>
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <p className="text-center text-gray-500 text-sm mt-6">
-          © 2024 Madadgaar. All rights reserved.
-        </p>
+        <div className="text-center mt-8 space-y-2">
+          <p className="text-gray-500 text-sm font-medium">
+            © 2025 Madadgaar. All rights reserved.
+          </p>
+          <p className="text-gray-400 text-xs">
+            Secure • Reliable • Professional
+          </p>
+        </div>
       </div>
     </div>
   );

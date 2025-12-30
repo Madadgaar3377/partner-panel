@@ -15,31 +15,31 @@
 @keyframes pulse-slow {
   0%, 100% {
     opacity: 0.2;
-  }
+      }
   50% {
     opacity: 0.3;
-  }
-}
+      }
+    }
 
 @keyframes shimmer {
   0% {
     background-position: -1000px 0;
-  }
+      }
   100% {
     background-position: 1000px 0;
   }
 }
 
 @keyframes slide-in-up {
-  from {
+      from {
     transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
+        opacity: 0;
+      }
+      to {
     transform: translateY(0);
-    opacity: 1;
-  }
-}
+        opacity: 1;
+      }
+    }
 
 /* Global Styles */
 * {

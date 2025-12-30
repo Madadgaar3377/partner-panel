@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgetPassword from './pages/ForgetPassword';
 import ResetPassword from './pages/ResetPassword';
+import VerifyOTP from './pages/VerifyOTP';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import ProfileView from './pages/ProfileView';
@@ -85,6 +86,7 @@ function App() {
         <Route path="/" element={<AuthPage />} />
         <Route path="/forget-password" element={<ForgetPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-otp" element={<VerifyOTP />} />
         
         {/* Dashboard & Profile */}
         <Route

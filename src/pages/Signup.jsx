@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, User, Phone, CreditCard, MapPin, AlertCircle, CheckCircle } from 'lucide-react';
 import baseApi from '../constants/apiUrl';
 
 const Signup = ({ onToggleForm }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -11,7 +13,7 @@ const Signup = ({ onToggleForm }) => {
     WhatsappNumber: '',
     cnicNumber: '',
     Address: '',
-    userType: 'partner',
+    UserType: 'partner',
     userAccess: []
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -76,8 +78,11 @@ const Signup = ({ onToggleForm }) => {
 
       if (data.success) {
         setSuccess(true);
+        // Store email for OTP verification
+        localStorage.setItem('signupEmail', formData.email);
         setTimeout(() => {
-          onToggleForm(); // Switch to login form
+          // Navigate to OTP verification page
+          navigate('/verify-otp', { state: { email: formData.email } });
         }, 1000);
       } else {
         setError(data.message || 'Signup failed. Please try again.');

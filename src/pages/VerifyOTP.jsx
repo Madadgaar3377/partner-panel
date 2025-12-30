@@ -190,7 +190,7 @@ const VerifyOTP = () => {
               onClick={() => navigate('/')}
               className="flex items-center justify-center gap-2 text-gray-600 hover:text-red-600 font-medium transition-colors mx-auto"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-5" />
               Back to Login
             </button>
           </div>

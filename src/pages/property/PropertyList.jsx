@@ -20,7 +20,7 @@ const PropertyList = () => {
   const fetchProperties = async () => {
     try {
       const token = localStorage.getItem('userToken');
-      const response = await fetch(`${apiUrl}/getAllProperties`, {
+      const response = await fetch(`${apiUrl}/getPropertiesByUserId`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -56,19 +56,65 @@ const PropertyList = () => {
     }
   };
 
+  // Helper function to get property data
+  const getPropertyData = (property) => {
+    if (property.type === 'Project' && property.project) {
+      return {
+        name: property.project.projectName || 'Unnamed Project',
+        city: property.project.city || '',
+        type: 'Project',
+        transactionType: property.project.transaction?.type || '',
+        price: property.project.transaction?.price || 0,
+        monthlyRent: property.project.transaction?.monthlyRent || 0,
+        monthlyInstallment: property.project.transaction?.monthlyInstallment || 0,
+        images: property.project.images || [],
+        propertyType: property.project.projectType || 'Project'
+      };
+    } else if (property.type === 'Individual' && property.individualProperty) {
+      return {
+        name: property.individualProperty.title || 'Unnamed Property',
+        city: property.individualProperty.city || '',
+        type: 'Individual',
+        transactionType: property.individualProperty.transaction?.type || '',
+        price: property.individualProperty.transaction?.price || 0,
+        monthlyRent: property.individualProperty.transaction?.monthlyRent || 0,
+        monthlyInstallment: property.individualProperty.transaction?.monthlyInstallment || 0,
+        images: property.individualProperty.images || [],
+        propertyType: property.individualProperty.propertyType || 'Individual Property',
+        bedrooms: property.individualProperty.bedrooms || 0,
+        bathrooms: property.individualProperty.bathrooms || 0,
+        areaSize: property.individualProperty.areaSize || '',
+        areaUnit: property.individualProperty.areaUnit || ''
+      };
+    }
+    return null;
+  };
+
   const filteredProperties = properties.filter(property => {
-    const matchesSearch = property.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         property.address?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'All' || property.typeOfProperty === filterType;
-    const matchesPurpose = filterPurpose === 'All' || property.purpose === filterPurpose;
+    const propData = getPropertyData(property);
+    if (!propData) return false;
+    
+    const matchesSearch = propData.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         propData.city?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'All' || property.type === filterType;
+    const matchesPurpose = filterPurpose === 'All' || propData.transactionType === filterPurpose;
     return matchesSearch && matchesType && matchesPurpose;
   });
 
   const stats = {
     total: properties.length,
-    forSale: properties.filter(p => p.purpose === 'For Sale').length,
-    forRent: properties.filter(p => p.purpose === 'For Rent').length,
-    onInstallment: properties.filter(p => p.purpose === 'On Installment').length,
+    forSale: properties.filter(p => {
+      const propData = getPropertyData(p);
+      return propData?.transactionType === 'Sale';
+    }).length,
+    forRent: properties.filter(p => {
+      const propData = getPropertyData(p);
+      return propData?.transactionType === 'Rent';
+    }).length,
+    onInstallment: properties.filter(p => {
+      const propData = getPropertyData(p);
+      return propData?.transactionType === 'Installment';
+    }).length,
   };
 
   if (loading) {
@@ -84,8 +130,8 @@ const PropertyList = () => {
         <div className="bg-white rounded-3xl p-8 shadow-lg border border-red-100">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Property Management</h1>
-              <p className="text-gray-600">Manage your real estate listings and applications</p>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">My Properties</h1>
+              <p className="text-gray-600">View and manage your property listings - Total: {stats.total}</p>
             </div>
             <button
               onClick={() => navigate('/property/create')}
@@ -147,7 +193,7 @@ const PropertyList = () => {
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search by name or address..."
+                placeholder="Search by property name or city..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -162,11 +208,8 @@ const PropertyList = () => {
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 appearance-none"
               >
                 <option value="All">All Types</option>
-                <option value="House">House</option>
-                <option value="Flat">Flat</option>
-                <option value="Residential Plot">Residential Plot</option>
-                <option value="Commercial Plot">Commercial Plot</option>
-                <option value="Agricultural Land">Agricultural Land</option>
+                <option value="Project">🏗️ Project</option>
+                <option value="Individual">🏠 Individual Property</option>
               </select>
             </div>
 
@@ -177,10 +220,10 @@ const PropertyList = () => {
                 onChange={(e) => setFilterPurpose(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 appearance-none"
               >
-                <option value="All">All Purposes</option>
-                <option value="For Sale">For Sale</option>
-                <option value="For Rent">For Rent</option>
-                <option value="On Installment">On Installment</option>
+                <option value="All">All Transaction Types</option>
+                <option value="Sale">For Sale</option>
+                <option value="Rent">For Rent</option>
+                <option value="Installment">On Installment</option>
               </select>
             </div>
           </div>
@@ -202,114 +245,144 @@ const PropertyList = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProperties.map((property) => (
-              <div
-                key={property._id}
-                className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1"
-              >
-                {/* Image */}
-                <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200">
-                  {property.images && property.images.length > 0 ? (
-                    <img
-                      src={property.images[0]}
-                      alt={property.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Building2 className="w-16 h-16 text-gray-300" />
+            {filteredProperties.map((property) => {
+              const propData = getPropertyData(property);
+              if (!propData) return null;
+
+              return (
+                <div
+                  key={property._id}
+                  className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-2xl transition-all transform hover:-translate-y-1"
+                >
+                  {/* Image */}
+                  <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200">
+                    {propData.images && propData.images.length > 0 ? (
+                      <img
+                        src={propData.images[0]}
+                        alt={propData.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Building2 className="w-16 h-16 text-gray-300" />
+                      </div>
+                    )}
+                    <div className="absolute top-3 left-3">
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-500 text-white">
+                        {property.type === 'Project' ? '🏗️ Project' : '🏠 Individual'}
+                      </span>
                     </div>
-                  )}
-                  <div className="absolute top-3 right-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      property.purpose === 'For Sale' ? 'bg-green-500 text-white' :
-                      property.purpose === 'For Rent' ? 'bg-blue-500 text-white' :
-                      'bg-orange-500 text-white'
-                    }`}>
-                      {property.purpose}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-6">
-                  <div className="mb-3">
-                    <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-1">
-                      {property.name || 'Unnamed Property'}
-                    </h3>
-                    <p className="text-sm text-gray-500 font-medium">
-                      {property.typeOfProperty || 'Property'}
-                    </p>
+                    <div className="absolute top-3 right-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        propData.transactionType === 'Sale' ? 'bg-green-500 text-white' :
+                        propData.transactionType === 'Rent' ? 'bg-blue-500 text-white' :
+                        'bg-orange-500 text-white'
+                      }`}>
+                        {propData.transactionType === 'Sale' ? 'For Sale' :
+                         propData.transactionType === 'Rent' ? 'For Rent' :
+                         'On Installment'}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-gray-600 mb-4">
-                    <MapPin className="w-4 h-4 text-red-600" />
-                    <span className="text-sm line-clamp-1">
-                      {property.address || 'Location not specified'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 mb-4 pb-4 border-b border-gray-100">
-                    {property.bedRooms && (
-                      <div className="flex items-center gap-1">
-                        <Bed className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-semibold">{property.bedRooms}</span>
-                      </div>
-                    )}
-                    {property.bathrooms && (
-                      <div className="flex items-center gap-1">
-                        <Bath className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-semibold">{property.bathrooms}</span>
-                      </div>
-                    )}
-                    {property.areaSize && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-semibold text-gray-700">{property.areaSize}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mb-4">
-                    <p className="text-2xl font-bold text-red-600">
-                      Rs {property.price?.toLocaleString() || '0'}
-                    </p>
-                    {property.purpose === 'For Rent' && (
-                      <p className="text-sm text-gray-600">per month</p>
-                    )}
-                    {property.purpose === 'On Installment' && property.monthlyInstallment > 0 && (
-                      <p className="text-sm text-gray-600">
-                        Rs {property.monthlyInstallment.toLocaleString()}/month
+                  {/* Content */}
+                  <div className="p-6">
+                    <div className="mb-3">
+                      <h3 className="text-xl font-bold text-gray-900 mb-1 line-clamp-1">
+                        {propData.name}
+                      </h3>
+                      <p className="text-sm text-gray-500 font-medium">
+                        {propData.propertyType}
                       </p>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* Actions */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => navigate(`/property/view/${property._id}`)}
-                      className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all"
-                    >
-                      <Eye className="w-4 h-4" />
-                      <span className="text-xs font-semibold">View</span>
-                    </button>
-                    <button
-                      onClick={() => navigate(`/property/edit/${property._id}`)}
-                      className="flex items-center justify-center gap-1 px-3 py-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100 transition-all"
-                    >
-                      <Edit className="w-4 h-4" />
-                      <span className="text-xs font-semibold">Edit</span>
-                    </button>
-                    <button
-                      onClick={() => handleDelete(property._id)}
-                      className="flex items-center justify-center gap-1 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="text-xs font-semibold">Delete</span>
-                    </button>
+                    <div className="flex items-center gap-2 text-gray-600 mb-4">
+                      <MapPin className="w-4 h-4 text-red-600" />
+                      <span className="text-sm line-clamp-1">
+                        {propData.city || 'Location not specified'}
+                      </span>
+                    </div>
+
+                    {propData.type === 'Individual' && (
+                      <div className="grid grid-cols-3 gap-3 mb-4 pb-4 border-b border-gray-100">
+                        {propData.bedrooms > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Bed className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-semibold">{propData.bedrooms}</span>
+                          </div>
+                        )}
+                        {propData.bathrooms > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Bath className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-semibold">{propData.bathrooms}</span>
+                          </div>
+                        )}
+                        {propData.areaSize && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-gray-700">
+                              {propData.areaSize} {propData.areaUnit}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mb-4">
+                      {propData.transactionType === 'Sale' && propData.price > 0 && (
+                        <p className="text-2xl font-bold text-red-600">
+                          Rs {propData.price.toLocaleString()}
+                        </p>
+                      )}
+                      {propData.transactionType === 'Rent' && (
+                        <>
+                          <p className="text-2xl font-bold text-red-600">
+                            Rs {propData.monthlyRent.toLocaleString()}
+                          </p>
+                          <p className="text-sm text-gray-600">per month</p>
+                        </>
+                      )}
+                      {propData.transactionType === 'Installment' && (
+                        <>
+                          <p className="text-2xl font-bold text-red-600">
+                            Rs {propData.price.toLocaleString()}
+                          </p>
+                          {propData.monthlyInstallment > 0 && (
+                            <p className="text-sm text-gray-600">
+                              Rs {propData.monthlyInstallment.toLocaleString()}/month
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() => navigate(`/property/view/${property._id}`)}
+                        className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span className="text-xs font-semibold">View</span>
+                      </button>
+                      <button
+                        onClick={() => navigate(`/property/edit/${property._id}`)}
+                        className="flex items-center justify-center gap-1 px-3 py-2 bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100 transition-all"
+                      >
+                        <Edit className="w-4 h-4" />
+                        <span className="text-xs font-semibold">Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(property._id)}
+                        className="flex items-center justify-center gap-1 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="text-xs font-semibold">Delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

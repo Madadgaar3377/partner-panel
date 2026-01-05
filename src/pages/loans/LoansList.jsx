@@ -20,7 +20,7 @@ const LoansList = () => {
   const fetchLoans = async () => {
     try {
       const token = localStorage.getItem('userToken');
-      const response = await fetch(`${apiUrl}/getAllLoans`, {
+      const response = await fetch(`${apiUrl}/getLoanByCreator`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -57,18 +57,19 @@ const LoansList = () => {
   };
 
   const filteredLoans = loans.filter(loan => {
-    const matchesSearch = loan.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         loan.loanPlanId?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'All' || loan.loanType === filterType;
-    const matchesEmployment = filterEmployment === 'All' || loan.employmentType === filterEmployment;
+    const matchesSearch = loan.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         loan.bankName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         loan.planId?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'All' || loan.majorCategory === filterType;
+    const matchesEmployment = filterEmployment === 'All' || loan.financingType === filterEmployment;
     return matchesSearch && matchesType && matchesEmployment;
   });
 
   const stats = {
     total: loans.length,
-    salaried: loans.filter(l => l.employmentType === 'Salaried').length,
-    selfEmployed: loans.filter(l => l.employmentType === 'Self-Employed').length,
-    startup: loans.filter(l => l.employmentType === 'Startup').length,
+    conventional: loans.filter(l => l.financingType === 'Conventional').length,
+    islamic: loans.filter(l => l.financingType === 'Islamic').length,
+    active: loans.filter(l => l.isActive !== false).length,
   };
 
   if (loading) {
@@ -112,8 +113,8 @@ const LoansList = () => {
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium mb-1">Salaried</p>
-                <p className="text-3xl font-bold">{stats.salaried}</p>
+                <p className="text-blue-100 text-sm font-medium mb-1">Conventional</p>
+                <p className="text-3xl font-bold">{stats.conventional}</p>
               </div>
               <Briefcase className="w-12 h-12 text-blue-200" />
             </div>
@@ -122,8 +123,8 @@ const LoansList = () => {
           <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-sm font-medium mb-1">Self-Employed</p>
-                <p className="text-3xl font-bold">{stats.selfEmployed}</p>
+                <p className="text-green-100 text-sm font-medium mb-1">Islamic</p>
+                <p className="text-3xl font-bold">{stats.islamic}</p>
               </div>
               <Users className="w-12 h-12 text-green-200" />
             </div>
@@ -132,8 +133,8 @@ const LoansList = () => {
           <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg transform hover:scale-105 transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-100 text-sm font-medium mb-1">Startup</p>
-                <p className="text-3xl font-bold">{stats.startup}</p>
+                <p className="text-orange-100 text-sm font-medium mb-1">Active Plans</p>
+                <p className="text-3xl font-bold">{stats.active}</p>
               </div>
               <TrendingUp className="w-12 h-12 text-orange-200" />
             </div>
@@ -147,7 +148,7 @@ const LoansList = () => {
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search by name or loan ID..."
+                placeholder="Search by product name, bank, or plan ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -161,13 +162,14 @@ const LoansList = () => {
                 onChange={(e) => setFilterType(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none"
               >
-                <option value="All">All Loan Types</option>
-                <option value="Personal Loan">Personal Loan</option>
-                <option value="Business Loan">Business Loan</option>
-                <option value="Home Loan">Home Loan</option>
-                <option value="Car Loan">Car Loan</option>
-                <option value="Education Loan">Education Loan</option>
-                <option value="Startup Loan">Startup Loan</option>
+                <option value="All">All Categories</option>
+                <option value="Home / Real Estate Financing">Home / Real Estate</option>
+                <option value="Auto Financing">Auto Financing</option>
+                <option value="Personal Financing">Personal Financing</option>
+                <option value="Business / SME Financing">Business / SME</option>
+                <option value="Other / Specialized Financing">Other / Specialized</option>
+                <option value="Installment / Buy-Now-Pay-Later Plans">Installment Plans</option>
+                <option value="Shariah-Compliant / Islamic Plans">Islamic Plans</option>
               </select>
             </div>
 
@@ -178,11 +180,9 @@ const LoansList = () => {
                 onChange={(e) => setFilterEmployment(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none"
               >
-                <option value="All">All Employment Types</option>
-                <option value="Salaried">Salaried</option>
-                <option value="Self-Employed">Self-Employed</option>
-                <option value="Startup">Startup</option>
-                <option value="Business Owner">Business Owner</option>
+                <option value="All">All Financing Types</option>
+                <option value="Conventional">Conventional</option>
+                <option value="Islamic">Islamic</option>
               </select>
             </div>
           </div>
@@ -211,63 +211,80 @@ const LoansList = () => {
               >
                 {/* Header with gradient */}
                 <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 text-white">
+                  {loan.planImage && (
+                    <div className="mb-4">
+                      <img src={loan.planImage} alt={loan.productName} className="w-full h-32 object-cover rounded-lg" />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full">
-                      {loan.loanPlanId || 'N/A'}
+                      {loan.planId || loan.bankName || 'N/A'}
                     </span>
                     <DollarSign className="w-8 h-8 text-white/80" />
                   </div>
                   <h3 className="text-xl font-bold mb-1">
-                    {loan.loanType || 'Loan Plan'}
+                    {loan.productName || 'Loan Plan'}
                   </h3>
                   <p className="text-purple-100 text-sm">
-                    {loan.employmentType || 'Employment Type'}
+                    {loan.bankName || 'Bank Name'}
                   </p>
                 </div>
 
                 {/* Content */}
                 <div className="p-6">
                   <div className="space-y-3 mb-6">
-                    {loan.name && (
+                    {loan.majorCategory && (
                       <div className="flex items-start gap-2">
-                        <Users className="w-4 h-4 text-gray-400 mt-0.5" />
+                        <Briefcase className="w-4 h-4 text-gray-400 mt-0.5" />
                         <div>
-                          <p className="text-xs text-gray-500">Applicant</p>
-                          <p className="text-sm font-semibold text-gray-900">{loan.name}</p>
+                          <p className="text-xs text-gray-500">Category</p>
+                          <p className="text-sm font-semibold text-gray-900">{loan.majorCategory}</p>
                         </div>
                       </div>
                     )}
 
-                    {loan.city && (
+                    {loan.financingType && (
                       <div className="flex items-start gap-2">
                         <Users className="w-4 h-4 text-gray-400 mt-0.5" />
                         <div>
-                          <p className="text-xs text-gray-500">City</p>
-                          <p className="text-sm font-semibold text-gray-900">{loan.city}</p>
+                          <p className="text-xs text-gray-500">Financing Type</p>
+                          <p className="text-sm font-semibold text-gray-900">{loan.financingType}</p>
                         </div>
                       </div>
                     )}
 
-                    {loan.date && (
+                    {(loan.minFinancingAmount || loan.maxFinancingAmount) && (
                       <div className="flex items-start gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400 mt-0.5" />
+                        <DollarSign className="w-4 h-4 text-gray-400 mt-0.5" />
                         <div>
-                          <p className="text-xs text-gray-500">Date</p>
+                          <p className="text-xs text-gray-500">Financing Amount</p>
                           <p className="text-sm font-semibold text-gray-900">
-                            {new Date(loan.date).toLocaleDateString()}
+                            PKR {loan.minFinancingAmount?.toLocaleString() || '0'} - {loan.maxFinancingAmount?.toLocaleString() || '0'}
                           </p>
                         </div>
                       </div>
                     )}
 
-                    {loan.isVerified !== undefined && (
+                    {(loan.minTenure || loan.maxTenure) && (
+                      <div className="flex items-start gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-gray-500">Tenure</p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {loan.minTenure || '0'} - {loan.maxTenure || '0'} {loan.tenureUnit || 'Months'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {loan.isActive !== undefined && (
                       <div className="mt-3 pt-3 border-t border-gray-100">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                          loan.isVerified 
+                          loan.isActive 
                             ? 'bg-green-100 text-green-700' 
-                            : 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
                         }`}>
-                          {loan.isVerified ? '✓ Verified' : '⏳ Pending Verification'}
+                          {loan.isActive ? '✓ Active' : '✗ Inactive'}
                         </span>
                       </div>
                     )}

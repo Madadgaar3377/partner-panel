@@ -11,6 +11,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
+import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 
 const defaultPlan = {
   planName: "",
@@ -23,16 +24,6 @@ const defaultPlan = {
   markup: 0,
   otherChargesNote: "",
 };
-
-const CATEGORY_OPTIONS = [
-  { value: "", label: "Select category" },
-  { value: "phones", label: "Phones / Mobile" },
-  { value: "bikes_mechanical", label: "Bikes — Mechanical" },
-  { value: "bikes_electric", label: "Bikes — Electric" },
-  { value: "air_conditioner", label: "Air Conditioner" },
-  { value: "appliances", label: "Home Appliances / Other" },
-  { value: "other", label: "Other (custom)" },
-];
 
 const EditInstallmentPlan = () => {
   const navigate = useNavigate();
@@ -61,31 +52,11 @@ const EditInstallmentPlan = () => {
     productImages: [],
     paymentPlans: [{ ...defaultPlan }],
 
-    generalFeatures: { operatingSystem: "", simSupport: "", phoneDimensions: "", phoneWeight: "", colors: "" },
-    performance: { processor: "", gpu: "" },
-    display: { screenSize: "", screenResolution: "", technology: "", protection: "" },
-    battery: { type: "" },
-    camera: { frontCamera: "", backCamera: "", features: "" },
-    memory: { internalMemory: "", ram: "", cardSlot: "" },
-    connectivity: { data: "", nfc: "", bluetooth: "", infrared: "" },
-
-    airConditioner: {
-      brand: "", model: "", color: "", capacityInTon: "", type: "", energyEfficient: "",
-      display: "", indoorDimension: "", outdoorDimension: "", indoorWeightKg: "",
-      outdoorWeightKg: "", powerSupply: "", otherFeatures: "", warranty: "",
-    },
-
-    electricalBike: {
-      model: "", dimensions: "", weight: "", speed: "", batterySpec: "", chargingTime: "",
-      brakes: "", warranty: "", transmission: "", rangeKm: "", groundClearance: "",
-      starting: "", motor: "", controllers: "", electricityConsumption: "", recommendedLoadCapacity: "",
-      wheelBase: "", shocks: "", tyreFront: "", tyreBack: "", otherFeatures: "", colors: "",
-    },
-
-    mechanicalBike: {
-      generalFeatures: { model: "", dimensions: "", weight: "", engine: "", colors: "", other: "" },
-      performance: { transmission: "", groundClearance: "", starting: "", displacement: "", petrolCapacity: "" },
-      assembly: { compressionRatio: "", boreAndStroke: "", tyreAtFront: "", tyreAtBack: "", seatHeight: "" },
+    // New dynamic product specifications
+    productSpecifications: {
+      category: "",
+      subCategory: "",
+      specifications: []
     },
   });
 
@@ -123,6 +94,25 @@ const EditInstallmentPlan = () => {
         if (data.success) {
           const plan = data.data.find(p => p._id === id || p.installmentPlanId === id);
           if (plan) {
+            // Initialize specifications based on category
+            let productSpecifications = {
+              category: plan.category || "",
+              subCategory: "",
+              specifications: []
+            };
+
+            // If plan has productSpecifications, use it
+            if (plan.productSpecifications && plan.productSpecifications.specifications) {
+              productSpecifications = plan.productSpecifications;
+            } else if (plan.category && CATEGORY_SPECIFICATIONS[plan.category]) {
+              // Migrate from old structure - initialize specs for the category
+              const specs = CATEGORY_SPECIFICATIONS[plan.category] || [];
+              productSpecifications.specifications = specs.map(spec => ({
+                field: spec.field,
+                value: ''
+              }));
+            }
+
             setForm({
               ...form,
               productName: plan.productName || "",
@@ -138,16 +128,7 @@ const EditInstallmentPlan = () => {
               status: plan.status || "pending",
               productImages: plan.productImages || [],
               paymentPlans: plan.paymentPlans?.length > 0 ? plan.paymentPlans : [{ ...defaultPlan }],
-              generalFeatures: plan.generalFeatures || form.generalFeatures,
-              performance: plan.performance || form.performance,
-              display: plan.display || form.display,
-              battery: plan.battery || form.battery,
-              camera: plan.camera || form.camera,
-              memory: plan.memory || form.memory,
-              connectivity: plan.connectivity || form.connectivity,
-              airConditioner: plan.airConditioner || form.airConditioner,
-              electricalBike: plan.electricalBike || form.electricalBike,
-              mechanicalBike: plan.mechanicalBike || form.mechanicalBike,
+              productSpecifications: productSpecifications
             });
           } else {
             setError('Installment plan not found');
@@ -186,6 +167,47 @@ const EditInstallmentPlan = () => {
       cur[parts[parts.length - 1]] = value;
       return copy;
     });
+  };
+
+  // Handle category change and initialize specifications
+  const handleCategoryChange = (category) => {
+    const specs = CATEGORY_SPECIFICATIONS[category] || [];
+    const initializedSpecs = specs.map(spec => ({
+      field: spec.field,
+      value: ''
+    }));
+
+    setForm(prev => ({
+      ...prev,
+      category: category,
+      productSpecifications: {
+        category: category,
+        subCategory: "",
+        specifications: initializedSpecs
+      }
+    }));
+  };
+
+  // Update a specific specification value
+  const updateSpecification = (fieldName, value) => {
+    setForm(prev => {
+      const updatedSpecs = prev.productSpecifications.specifications.map(spec =>
+        spec.field === fieldName ? { ...spec, value } : spec
+      );
+      return {
+        ...prev,
+        productSpecifications: {
+          ...prev.productSpecifications,
+          specifications: updatedSpecs
+        }
+      };
+    });
+  };
+
+  // Get specification value
+  const getSpecValue = (fieldName) => {
+    const spec = form.productSpecifications.specifications.find(s => s.field === fieldName);
+    return spec ? spec.value : '';
   };
 
   // --- Calculation Logic ---
@@ -458,20 +480,18 @@ const EditInstallmentPlan = () => {
                   </label>
                   <select
                     value={form.category}
-                    onChange={e => updateForm('category', e.target.value)}
+                    onChange={e => handleCategoryChange(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
                   >
-                    {CATEGORY_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
+                    <option value="">Select Category</option>
+                    {Object.entries(getGroupedCategories()).map(([group, categories]) => (
+                      <optgroup key={group} label={group}>
+                        {categories.map(cat => (
+                          <option key={cat.value} value={cat.value}>{cat.label}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
-                  {form.category === "other" && (
-                    <InputField
-                      value={form.customCategory}
-                      onChange={v => updateForm('customCategory', v)}
-                      placeholder="Specify category..."
-                    />
-                  )}
                 </div>
 
                 <InputField
@@ -511,31 +531,68 @@ const EditInstallmentPlan = () => {
                 Technical Specifications
               </h2>
 
-              {form.category === "phones" && (
-                <PhoneSpecs form={form} updateForm={updateForm} />
-              )}
-
-              {form.category === "bikes_mechanical" && (
-                <MechanicalBikeSpecs form={form} updateForm={updateForm} />
-              )}
-
-              {form.category === "bikes_electric" && (
-                <ElectricalBikeSpecs form={form} updateForm={updateForm} />
-              )}
-
-              {form.category === "air_conditioner" && (
-                <AirConditionerSpecs form={form} updateForm={updateForm} />
-              )}
-
-              {(!form.category || form.category === "other" || form.category === "appliances") && (
+              {!form.category || !CATEGORY_SPECIFICATIONS[form.category] ? (
                 <div className="py-20 text-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
                   <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500 font-medium">
-                    No specific technical specifications required for this category
+                    {!form.category ? 'Please select a category in Step 1' : 'No specific technical specifications required for this category'}
                   </p>
                   <p className="text-sm text-gray-400 mt-2">
-                    Skip to the next step to continue
+                    {!form.category ? 'Go back to Step 1 and select a product category' : 'Skip to the next step to continue'}
                   </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {CATEGORY_SPECIFICATIONS[form.category]?.map((spec, index) => (
+                    <div key={index} className={spec.type === 'textarea' ? 'md:col-span-2 lg:col-span-3' : ''}>
+                      {spec.type === 'text' || !spec.type ? (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            {spec.field} {spec.required && <span className="text-red-500">*</span>}
+                          </label>
+                          <input
+                            type="text"
+                            value={getSpecValue(spec.field)}
+                            onChange={e => updateSpecification(spec.field, e.target.value)}
+                            placeholder={spec.placeholder || `Enter ${spec.field.toLowerCase()}`}
+                            required={spec.required}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                          />
+                        </div>
+                      ) : spec.type === 'select' ? (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            {spec.field} {spec.required && <span className="text-red-500">*</span>}
+                          </label>
+                          <select
+                            value={getSpecValue(spec.field)}
+                            onChange={e => updateSpecification(spec.field, e.target.value)}
+                            required={spec.required}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                          >
+                            <option value="">Select {spec.field}</option>
+                            {spec.options?.map((option, i) => (
+                              <option key={i} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : spec.type === 'textarea' ? (
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            {spec.field} {spec.required && <span className="text-red-500">*</span>}
+                          </label>
+                          <textarea
+                            value={getSpecValue(spec.field)}
+                            onChange={e => updateSpecification(spec.field, e.target.value)}
+                            placeholder={spec.placeholder || `Enter ${spec.field.toLowerCase()}`}
+                            required={spec.required}
+                            rows={3}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all resize-none"
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -716,77 +773,6 @@ const InputField = ({ label, value, onChange, type = "text", placeholder = "", r
         readOnly ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : 'bg-white'
       }`}
     />
-  </div>
-);
-
-// Phone Specifications Component
-const PhoneSpecs = ({ form, updateForm }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <div className="col-span-full">
-      <h3 className="text-lg font-semibold text-red-600 mb-4">General Features</h3>
-    </div>
-    <InputField label="Operating System" value={form.generalFeatures.operatingSystem} onChange={v => updateForm('generalFeatures.operatingSystem', v)} />
-    <InputField label="SIM Support" value={form.generalFeatures.simSupport} onChange={v => updateForm('generalFeatures.simSupport', v)} />
-    <InputField label="Dimensions" value={form.generalFeatures.phoneDimensions} onChange={v => updateForm('generalFeatures.phoneDimensions', v)} />
-    <InputField label="Weight" value={form.generalFeatures.phoneWeight} onChange={v => updateForm('generalFeatures.phoneWeight', v)} />
-    <InputField label="Colors" value={form.generalFeatures.colors} onChange={v => updateForm('generalFeatures.colors', v)} />
-    
-    <div className="col-span-full mt-4">
-      <h3 className="text-lg font-semibold text-red-600 mb-4">Performance</h3>
-    </div>
-    <InputField label="Processor" value={form.performance.processor} onChange={v => updateForm('performance.processor', v)} />
-    <InputField label="GPU" value={form.performance.gpu} onChange={v => updateForm('performance.gpu', v)} />
-    
-    <div className="col-span-full mt-4">
-      <h3 className="text-lg font-semibold text-red-600 mb-4">Display</h3>
-    </div>
-    <InputField label="Screen Size" value={form.display.screenSize} onChange={v => updateForm('display.screenSize', v)} />
-    <InputField label="Resolution" value={form.display.screenResolution} onChange={v => updateForm('display.screenResolution', v)} />
-    <InputField label="Technology" value={form.display.technology} onChange={v => updateForm('display.technology', v)} />
-    
-    <div className="col-span-full mt-4">
-      <h3 className="text-lg font-semibold text-red-600 mb-4">Camera & Memory</h3>
-    </div>
-    <InputField label="Front Camera" value={form.camera.frontCamera} onChange={v => updateForm('camera.frontCamera', v)} />
-    <InputField label="Back Camera" value={form.camera.backCamera} onChange={v => updateForm('camera.backCamera', v)} />
-    <InputField label="RAM" value={form.memory.ram} onChange={v => updateForm('memory.ram', v)} />
-    <InputField label="Internal Memory" value={form.memory.internalMemory} onChange={v => updateForm('memory.internalMemory', v)} />
-    <InputField label="Battery Type" value={form.battery.type} onChange={v => updateForm('battery.type', v)} />
-  </div>
-);
-
-// Mechanical Bike Specs
-const MechanicalBikeSpecs = ({ form, updateForm }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <InputField label="Engine" value={form.mechanicalBike.generalFeatures.engine} onChange={v => updateForm('mechanicalBike.generalFeatures.engine', v)} />
-    <InputField label="Model Year" value={form.mechanicalBike.generalFeatures.model} onChange={v => updateForm('mechanicalBike.generalFeatures.model', v)} />
-    <InputField label="Displacement" value={form.mechanicalBike.performance.displacement} onChange={v => updateForm('mechanicalBike.performance.displacement', v)} />
-    <InputField label="Transmission" value={form.mechanicalBike.performance.transmission} onChange={v => updateForm('mechanicalBike.performance.transmission', v)} />
-    <InputField label="Fuel Capacity" value={form.mechanicalBike.performance.petrolCapacity} onChange={v => updateForm('mechanicalBike.performance.petrolCapacity', v)} />
-    <InputField label="Ground Clearance" value={form.mechanicalBike.performance.groundClearance} onChange={v => updateForm('mechanicalBike.performance.groundClearance', v)} />
-  </div>
-);
-
-// Electrical Bike Specs
-const ElectricalBikeSpecs = ({ form, updateForm }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <InputField label="Model Year" value={form.electricalBike.model} onChange={v => updateForm('electricalBike.model', v)} />
-    <InputField label="Battery Spec" value={form.electricalBike.batterySpec} onChange={v => updateForm('electricalBike.batterySpec', v)} />
-    <InputField label="Range (KM)" value={form.electricalBike.rangeKm} onChange={v => updateForm('electricalBike.rangeKm', v)} />
-    <InputField label="Motor" value={form.electricalBike.motor} onChange={v => updateForm('electricalBike.motor', v)} />
-    <InputField label="Charging Time" value={form.electricalBike.chargingTime} onChange={v => updateForm('electricalBike.chargingTime', v)} />
-    <InputField label="Speed" value={form.electricalBike.speed} onChange={v => updateForm('electricalBike.speed', v)} />
-  </div>
-);
-
-// Air Conditioner Specs
-const AirConditionerSpecs = ({ form, updateForm }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <InputField label="Brand" value={form.airConditioner.brand} onChange={v => updateForm('airConditioner.brand', v)} />
-    <InputField label="Capacity (Ton)" value={form.airConditioner.capacityInTon} onChange={v => updateForm('airConditioner.capacityInTon', v)} />
-    <InputField label="Energy Efficient" value={form.airConditioner.energyEfficient} onChange={v => updateForm('airConditioner.energyEfficient', v)} />
-    <InputField label="Type" value={form.airConditioner.type} onChange={v => updateForm('airConditioner.type', v)} />
-    <InputField label="Warranty" value={form.airConditioner.warranty} onChange={v => updateForm('airConditioner.warranty', v)} />
   </div>
 );
 

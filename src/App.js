@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import { isAuthenticated, isSessionExpired, clearUserSession, getUserData } from './utils/auth';
 import Signup from './pages/Signup';
 import ForgetPassword from './pages/ForgetPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -8,6 +9,8 @@ import VerifyOTP from './pages/VerifyOTP';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import ProfileView from './pages/ProfileView';
+import CompleteProfile from './pages/CompleteProfile';
+import PendingVerification from './pages/PendingVerification';
 
 // Installments
 import InstallmentsList from './pages/installments/InstallmentsList';
@@ -48,35 +51,38 @@ const AuthPage = () => {
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-  const loginExpiration = localStorage.getItem('loginExpiration');
+  const authenticated = isAuthenticated();
+  const userData = getUserData();
   
-  // If authenticated but no expiration (old session), force re-login
-  if (isAuthenticated && !loginExpiration) {
-    localStorage.removeItem('userToken');
-    localStorage.removeItem('userData');
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('loginTime');
+  // Check if session has expired
+  if (!authenticated || isSessionExpired()) {
+    // Session expired or invalid, clear and redirect
+    clearUserSession();
     return <Navigate to="/" replace />;
   }
   
-  // Check if login has expired
-  if (isAuthenticated && loginExpiration) {
-    const expirationDate = new Date(loginExpiration);
-    const currentDate = new Date();
+  // Check user verification and profile completion status
+  if (authenticated && userData) {
+    const hasCompanyDetails = userData.companyDetails && userData.companyDetails.RegisteredCompanyName;
+    const currentPath = window.location.pathname;
     
-    if (currentDate > expirationDate) {
-      // Session expired, clear localStorage
-      localStorage.removeItem('userToken');
-      localStorage.removeItem('userData');
-      localStorage.removeItem('isAuthenticated');
-      localStorage.removeItem('loginTime');
-      localStorage.removeItem('loginExpiration');
-      return <Navigate to="/" replace />;
+    // Allow access to complete-profile and pending-verification pages without restrictions
+    if (currentPath === '/complete-profile' || currentPath === '/pending-verification') {
+      return children;
+    }
+    
+    // If profile not complete, redirect to complete-profile
+    if (!hasCompanyDetails) {
+      return <Navigate to="/complete-profile" replace />;
+    }
+    
+    // If profile complete but not verified by admin, redirect to pending-verification
+    if (hasCompanyDetails && !userData.isVerified) {
+      return <Navigate to="/pending-verification" replace />;
     }
   }
   
-  return isAuthenticated ? children : <Navigate to="/" replace />;
+  return children;
 };
 
 function App() {
@@ -87,6 +93,26 @@ function App() {
         <Route path="/forget-password" element={<ForgetPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-otp" element={<VerifyOTP />} />
+        
+        {/* Complete Profile */}
+        <Route
+          path="/complete-profile"
+          element={
+            <ProtectedRoute>
+              <CompleteProfile />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Pending Verification */}
+        <Route
+          path="/pending-verification"
+          element={
+            <ProtectedRoute>
+              <PendingVerification />
+            </ProtectedRoute>
+          }
+        />
         
         {/* Dashboard & Profile */}
         <Route

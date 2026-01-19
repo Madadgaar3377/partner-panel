@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 import baseApi from '../constants/apiUrl';
+import { saveUserSession } from '../utils/auth';
 
 const Login = ({ onToggleForm }) => {
   const [formData, setFormData] = useState({
@@ -36,25 +37,46 @@ const Login = ({ onToggleForm }) => {
       const data = await response.json();
 
       if (data.success) {
-        // check if the user is verified
-        if(data.user.isVerified === false){
-          setError('Please wait for admin to verify your account');
+        const user = data.user;
+        
+        // Check if email is verified first
+        if (!user.emailVerify) {
+          setError('Please verify your email address before logging in. Check your inbox for the verification link.');
           return;
         }
         
-        // Calculate expiration time (15 days from now)
-        const loginTime = new Date();
-        const expirationTime = new Date(loginTime.getTime() + (15 * 24 * 60 * 60 * 1000)); // 15 days in milliseconds
+        // Save user session (20 days expiration)
+        saveUserSession(data.token, user);
         
-        // Store user data in localStorage with expiration
-        localStorage.setItem('userToken', data.token || '');
-        localStorage.setItem('userData', JSON.stringify(data.user || {}));
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('loginTime', loginTime.toISOString());
-        localStorage.setItem('loginExpiration', expirationTime.toISOString());
+        // Check if user has completed their profile (companyDetails with documents)
+        const hasCompanyDetails = user.companyDetails && 
+                                  user.companyDetails.RegisteredCompanyName;
+        const hasDocuments = user.companyDetails?.SECPRegistrationCertificate || 
+                            user.companyDetails?.CompanyProfilePDF;
         
-        // Redirect to dashboard or main page
-        window.location.href = '/dashboard';
+        // Routing logic based on verification states
+        if (user.emailVerify && !user.isVerified) {
+          // Email verified but not admin verified
+          if (!hasCompanyDetails || !hasDocuments) {
+            // Profile incomplete - redirect to complete profile
+            window.location.href = '/complete-profile';
+          } else {
+            // Profile complete with documents - waiting for admin approval
+            window.location.href = '/pending-verification';
+          }
+        } else if (user.emailVerify && user.isVerified) {
+          // Both email verified and admin verified
+          if (!hasCompanyDetails) {
+            // Edge case: verified but profile incomplete
+            window.location.href = '/complete-profile';
+          } else {
+            // Fully verified - redirect to dashboard
+            window.location.href = '/dashboard';
+          }
+        } else {
+          // Should not reach here, but fallback
+          setError('Account verification status unclear. Please contact support.');
+        }
       } else {
         setError(data.message || 'Login failed. Please try again.');
       }

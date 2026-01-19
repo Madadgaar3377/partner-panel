@@ -13,11 +13,13 @@ import {
   Video,
   AlertCircle,
   Package,
-  CheckCircle
+  CheckCircle,
+  Info
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
+import { PRODUCT_CATEGORIES } from '../../constants/productCategories';
 
 const InstallmentDetail = () => {
   const navigate = useNavigate();
@@ -324,69 +326,22 @@ const InstallmentDetail = () => {
               </div>
             )}
 
-            {/* Product Features - Conditional rendering based on category */}
-            {installment.mechanicalBike && Object.keys(installment.mechanicalBike.generalFeatures || {}).some(key => installment.mechanicalBike.generalFeatures[key]) && (
+            {/* Product Specifications - Dynamic */}
+            {installment.productSpecifications && installment.productSpecifications.specifications && installment.productSpecifications.specifications.some(spec => spec.value) && (
               <div className="glass-red rounded-xl shadow-lg p-8">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">Mechanical Bike Specifications</h2>
-                
-                {/* General Features */}
-                {installment.mechanicalBike.generalFeatures && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-700 mb-3">General Features</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {Object.entries(installment.mechanicalBike.generalFeatures).map(([key, value]) => value && (
-                        <div key={key} className="p-3 bg-white rounded-lg">
-                          <p className="text-xs text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
-                          <p className="text-sm font-medium text-gray-800">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Performance */}
-                {installment.mechanicalBike.performance && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-gray-700 mb-3">Performance</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {Object.entries(installment.mechanicalBike.performance).map(([key, value]) => value && (
-                        <div key={key} className="p-3 bg-white rounded-lg">
-                          <p className="text-xs text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
-                          <p className="text-sm font-medium text-gray-800">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Assembly */}
-                {installment.mechanicalBike.assembly && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-700 mb-3">Assembly</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {Object.entries(installment.mechanicalBike.assembly).map(([key, value]) => value && (
-                        <div key={key} className="p-3 bg-white rounded-lg">
-                          <p className="text-xs text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
-                          <p className="text-sm font-medium text-gray-800">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Electrical Bike Specifications */}
-            {installment.electricalBike && Object.values(installment.electricalBike).some(val => val) && (
-              <div className="glass-red rounded-xl shadow-lg p-8">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">Electrical Bike Specifications</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {Object.entries(installment.electricalBike).map(([key, value]) => value && (
-                    <div key={key} className="p-3 bg-white rounded-lg">
-                      <p className="text-xs text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
-                      <p className="text-sm font-medium text-gray-800">{value}</p>
-                    </div>
-                  ))}
+                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                  <Info className="w-6 h-6 text-blue-600" />
+                  Product Specifications
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {installment.productSpecifications.specifications.map((spec, index) => 
+                    spec.value && (
+                      <div key={index} className={`p-4 bg-white rounded-lg border border-gray-200 ${spec.field.length > 20 || (spec.value && spec.value.length > 50) ? 'md:col-span-2 lg:col-span-3' : ''}`}>
+                        <p className="text-xs text-gray-500 font-semibold mb-1">{spec.field}</p>
+                        <p className="text-sm text-gray-800 whitespace-pre-line">{spec.value}</p>
+                      </div>
+                    )
+                  )}
                 </div>
               </div>
             )}

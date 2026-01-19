@@ -13,6 +13,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { getUserData, clearUserSession } from '../utils/auth';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -22,18 +23,14 @@ const Navbar = () => {
   const [openDropdown, setOpenDropdown] = useState(null);
 
   useEffect(() => {
-    const storedUserData = localStorage.getItem('userData');
+    const storedUserData = getUserData();
     if (storedUserData) {
-      setUserData(JSON.parse(storedUserData));
+      setUserData(storedUserData);
     }
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('userToken');
-    localStorage.removeItem('userData');
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('loginTime');
-    localStorage.removeItem('loginExpiration');
+    clearUserSession();
     navigate('/');
   };
 

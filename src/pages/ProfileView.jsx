@@ -492,6 +492,13 @@ const ProfileView = () => {
                       </div>
                     )}
 
+                    {userData.companyDetails.CommissionPercentage && (
+                      <div className="p-4 bg-white rounded-lg border border-gray-200">
+                        <p className="text-xs text-gray-500 mb-1">Commission Percentage</p>
+                        <p className="text-sm font-medium text-gray-800">{userData.companyDetails.CommissionPercentage}%</p>
+                      </div>
+                    )}
+
                     {userData.companyDetails.CommissionLock && (
                       <div className="p-4 bg-white rounded-lg border border-gray-200">
                         <p className="text-xs text-gray-500 mb-1">Commission Lock Period</p>

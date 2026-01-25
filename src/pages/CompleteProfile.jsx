@@ -41,6 +41,7 @@ const CompleteProfile = () => {
       DeliveryPolicyDocument: '',
       CompanyProfilePDF: '',
       CommissionType: '',
+      CommissionPercentage: '',
       CommissionLock: '',
       cnicPic: [],
       AuthorizedAgencyLetter: '',
@@ -941,7 +942,7 @@ const CompleteProfile = () => {
             <div className="mt-8 pt-8 border-t border-gray-200">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Commission Settings</h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Commission Type
@@ -957,6 +958,21 @@ const CompleteProfile = () => {
                       <option key={type} value={type}>{type}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Commission Percentage <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="CommissionPercentage"
+                    value={formData.companyDetails.CommissionPercentage}
+                    onChange={handleInput}
+                    placeholder="e.g., 5% or 10%"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Enter percentage value (e.g., 5 for 5%)</p>
                 </div>
 
                 <div>

@@ -48,26 +48,25 @@ const Login = ({ onToggleForm }) => {
         // Save user session (20 days expiration)
         saveUserSession(data.token, user);
         
-        // Check if user has completed their profile (companyDetails with documents)
+        // Check if user has completed their profile
+        // Profile is considered complete if RegisteredCompanyName exists (main required field)
         const hasCompanyDetails = user.companyDetails && 
                                   user.companyDetails.RegisteredCompanyName;
-        const hasDocuments = user.companyDetails?.SECPRegistrationCertificate || 
-                            user.companyDetails?.CompanyProfilePDF;
         
         // Routing logic based on verification states
         if (user.emailVerify && !user.isVerified) {
           // Email verified but not admin verified
-          if (!hasCompanyDetails || !hasDocuments) {
+          if (!hasCompanyDetails) {
             // Profile incomplete - redirect to complete profile
             window.location.href = '/complete-profile';
           } else {
-            // Profile complete with documents - waiting for admin approval
+            // Profile complete but waiting for admin approval
             window.location.href = '/pending-verification';
           }
         } else if (user.emailVerify && user.isVerified) {
           // Both email verified and admin verified
           if (!hasCompanyDetails) {
-            // Edge case: verified but profile incomplete
+            // Edge case: verified but profile incomplete - redirect to complete profile
             window.location.href = '/complete-profile';
           } else {
             // Fully verified - redirect to dashboard

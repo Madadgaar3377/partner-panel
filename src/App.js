@@ -63,14 +63,40 @@ const ProtectedRoute = ({ children }) => {
   
   // Check user verification and profile completion status
   if (authenticated && userData) {
-    const hasCompanyDetails = userData.companyDetails && userData.companyDetails.RegisteredCompanyName;
+    // Check if profile is complete (has RegisteredCompanyName - main required field)
+    const hasCompanyDetails = userData.companyDetails && 
+                              userData.companyDetails.RegisteredCompanyName;
     const currentPath = window.location.pathname;
     
-    // Allow access to complete-profile and pending-verification pages without restrictions
-    if (currentPath === '/complete-profile' || currentPath === '/pending-verification') {
+    // Handle complete-profile page
+    if (currentPath === '/complete-profile') {
+      // If profile is already complete and verified, redirect to dashboard
+      if (hasCompanyDetails && userData.isVerified) {
+        return <Navigate to="/dashboard" replace />;
+      }
+      // If profile is complete but not verified, redirect to pending-verification
+      if (hasCompanyDetails && !userData.isVerified) {
+        return <Navigate to="/pending-verification" replace />;
+      }
+      // Profile not complete - allow access to complete-profile
       return children;
     }
     
+    // Handle pending-verification page
+    if (currentPath === '/pending-verification') {
+      // If profile is not complete, redirect to complete-profile
+      if (!hasCompanyDetails) {
+        return <Navigate to="/complete-profile" replace />;
+      }
+      // If already verified, redirect to dashboard
+      if (hasCompanyDetails && userData.isVerified) {
+        return <Navigate to="/dashboard" replace />;
+      }
+      // Profile complete but not verified - allow access to pending-verification
+      return children;
+    }
+    
+    // For all other protected routes:
     // If profile not complete, redirect to complete-profile
     if (!hasCompanyDetails) {
       return <Navigate to="/complete-profile" replace />;

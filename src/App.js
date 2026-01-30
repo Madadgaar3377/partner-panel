@@ -34,6 +34,10 @@ import LoanDetail from './pages/loans/LoanDetail';
 // Insurance
 import InsuranceList from './pages/insurance/InsuranceList';
 
+// Commission
+import CommissionConfiguration from './pages/commission/CommissionConfiguration';
+import CommissionManagement from './pages/commission/CommissionManagement';
+
 // Auth Page Component (handles login/signup toggle)
 const AuthPage = () => {
   const [showLogin, setShowLogin] = useState(true);
@@ -314,6 +318,24 @@ function App() {
           element={
             <ProtectedRoute>
               <InsuranceList />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Commission Routes */}
+        <Route
+          path="/commission/configure"
+          element={
+            <ProtectedRoute>
+              <CommissionConfiguration />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/commission/management"
+          element={
+            <ProtectedRoute>
+              <CommissionManagement />
             </ProtectedRoute>
           }
         />

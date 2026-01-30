@@ -386,6 +386,175 @@ const CompleteProfile = () => {
         // Update localStorage with new user data
         localStorage.setItem('userData', JSON.stringify(result.user));
         
+        // Create/Update commission rules if partner type is set
+        if (formData.companyDetails.PartnerType) {
+          try {
+            const commissionData = {
+              partnerId: userData?.userId,
+              partnerType: formData.companyDetails.PartnerType,
+              isActive: true,
+            };
+
+            // Set default commission based on partner type
+            const defaultCommission = parseFloat(formData.companyDetails.CommissionPercentage) || 2;
+            const commissionType = formData.companyDetails.CommissionType || 'Percentage';
+
+            // Initialize commission structure based on partner type
+            if (formData.companyDetails.PartnerType === 'Property') {
+              commissionData.propertyCommission = {
+                saleCommission: {
+                  enabled: true,
+                  commissionBasis: 'Sale Price',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Agreement Signed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                rentCommission: {
+                  enabled: true,
+                  commissionBasis: 'Rent Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Agreement Signed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                installmentCommission: {
+                  enabled: true,
+                  commissionBasis: 'First Installment Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Agreement Signed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+              };
+            } else if (formData.companyDetails.PartnerType === 'Installment') {
+              commissionData.installmentProductCommission = {
+                installmentSaleCommission: {
+                  enabled: true,
+                  commissionBasis: 'Product Cash Price',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Product Delivered',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                cashSaleCommission: {
+                  enabled: true,
+                  commissionBasis: 'Product Cash Price',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Product Delivered',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+              };
+            } else if (formData.companyDetails.PartnerType === 'Loan') {
+              commissionData.loanCommission = {
+                homeLoanCommission: {
+                  enabled: true,
+                  commissionBasis: 'Disbursed Loan Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Loan Disbursed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                personalLoanCommission: {
+                  enabled: true,
+                  commissionBasis: 'Disbursed Loan Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Loan Disbursed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                businessLoanCommission: {
+                  enabled: true,
+                  commissionBasis: 'Disbursed Loan Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Loan Disbursed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                autoLoanCommission: {
+                  enabled: true,
+                  commissionBasis: 'Disbursed Loan Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Loan Disbursed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+              };
+            } else if (formData.companyDetails.PartnerType === 'Insurance') {
+              commissionData.insuranceCommission = {
+                policyIssuanceCommission: {
+                  enabled: true,
+                  commissionBasis: 'Yearly Premium Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Policy Issued',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                claimSettlementCommission: {
+                  enabled: true,
+                  commissionBasis: 'Claim Settlement Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Claim Approved / Settled',
+                  payableAt: 'Claim Settled',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                policyRenewalCommission: {
+                  enabled: true,
+                  commissionBasis: 'Renewal Premium Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Renewal Completed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+              };
+            }
+
+            // Check if commission rules already exist
+            const checkResponse = await fetch(`${apiUrl}/getCommissionRules`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            const checkData = await checkResponse.json();
+            const hasExistingRules = checkData.success && checkData.data;
+
+            // Create or update commission rules
+            const commissionResponse = await fetch(
+              `${apiUrl}${hasExistingRules ? '/updateCommissionRules' : '/createCommissionRules'}`,
+              {
+                method: hasExistingRules ? 'PUT' : 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(commissionData),
+              }
+            );
+
+            // Don't fail profile update if commission rules fail
+            if (!commissionResponse.ok) {
+              console.warn('Commission rules could not be saved, but profile was updated');
+            }
+          } catch (err) {
+            console.warn('Error saving commission rules:', err);
+            // Don't fail profile update if commission rules fail
+          }
+        }
+        
         // Check if user is verified by admin
         if (result.user.isVerified) {
           setMessage('Profile completed successfully! Redirecting to dashboard...');
@@ -549,6 +718,56 @@ const CompleteProfile = () => {
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
+
+              {/* Commission Configuration Section */}
+              {formData.companyDetails.PartnerType && (
+                <div className="md:col-span-2 mt-6 pt-6 border-t-2 border-gray-200">
+                  <div className="flex items-center gap-3 mb-4">
+                    <CreditCard className="w-6 h-6 text-green-600" />
+                    <h3 className="text-lg font-bold text-gray-900">Default Commission Configuration</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Set default commission percentage for agents. You can update this later in your profile.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Default Commission Percentage (%)
+                      </label>
+                      <input
+                        type="number"
+                        name="CommissionPercentage"
+                        value={formData.companyDetails.CommissionPercentage}
+                        onChange={handleInput}
+                        placeholder="e.g., 2.5"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Default: 2% (you can configure detailed rules later)
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Commission Type
+                      </label>
+                      <select
+                        name="CommissionType"
+                        value={formData.companyDetails.CommissionType}
+                        onChange={handleInput}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      >
+                        <option value="">Select Type</option>
+                        <option value="Percentage">Percentage (%)</option>
+                        <option value="Fixed Amount">Fixed Amount (PKR)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );

@@ -38,6 +38,15 @@ const Navbar = () => {
 
   // Define menu items based on access
   const accessMenus = {
+    Commission: {
+      icon: DollarSign,
+      label: 'Commission',
+      color: 'emerald',
+      items: [
+        { label: 'Configure Rules', path: '/commission/configure' },
+        { label: 'Manage Commissions', path: '/commission/management' }
+      ]
+    },
     Installments: {
       icon: FileText,
       label: 'Installments',
@@ -81,7 +90,9 @@ const Navbar = () => {
   };
 
   // Get available menus based on user access
-  const availableMenus = userData.userAccess?.map(access => accessMenus[access]).filter(Boolean) || [];
+  const availableMenus = [
+    ...(userData.userAccess?.map(access => accessMenus[access]).filter(Boolean) || [])
+  ];
 
   const toggleDropdown = (label) => {
     setOpenDropdown(openDropdown === label ? null : label);

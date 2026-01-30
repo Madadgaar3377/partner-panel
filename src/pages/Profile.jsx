@@ -36,6 +36,11 @@ const Profile = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [commissionData, setCommissionData] = useState({
+    defaultCommission: 2,
+    commissionType: 'Percentage',
+  });
+  const [loadingCommission, setLoadingCommission] = useState(false);
 
   // Available access options for partners
   const accessOptions = [
@@ -69,8 +74,57 @@ const Profile = () => {
         userAccess: user.userAccess || []
       });
       setImagePreview(user.profilePic || '');
+      
+      // Fetch commission rules if partner type exists
+      if (user.companyDetails?.PartnerType) {
+        fetchCommissionRules(user.userId);
+      }
     }
   }, [navigate]);
+
+  const fetchCommissionRules = async (userId) => {
+    try {
+      setLoadingCommission(true);
+      const token = localStorage.getItem('userToken');
+      const response = await fetch(`${baseApi}/getCommissionRules`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const data = await response.json();
+      if (data.success && data.data) {
+        // Extract default commission from first enabled commission
+        const rules = data.data;
+        let defaultCommission = 2;
+        let commissionType = 'Percentage';
+        
+        if (rules.partnerType === 'Property' && rules.propertyCommission?.saleCommission?.enabled) {
+          defaultCommission = rules.propertyCommission.saleCommission.commissionValue || 2;
+          commissionType = rules.propertyCommission.saleCommission.commissionType || 'Percentage';
+        } else if (rules.partnerType === 'Installment' && rules.installmentProductCommission?.installmentSaleCommission?.enabled) {
+          defaultCommission = rules.installmentProductCommission.installmentSaleCommission.commissionValue || 2;
+          commissionType = rules.installmentProductCommission.installmentSaleCommission.commissionType || 'Percentage';
+        } else if (rules.partnerType === 'Loan' && rules.loanCommission?.homeLoanCommission?.enabled) {
+          defaultCommission = rules.loanCommission.homeLoanCommission.commissionValue || 2;
+          commissionType = rules.loanCommission.homeLoanCommission.commissionType || 'Percentage';
+        } else if (rules.partnerType === 'Insurance' && rules.insuranceCommission?.policyIssuanceCommission?.enabled) {
+          defaultCommission = rules.insuranceCommission.policyIssuanceCommission.commissionValue || 2;
+          commissionType = rules.insuranceCommission.policyIssuanceCommission.commissionType || 'Percentage';
+        }
+        
+        setCommissionData({
+          defaultCommission,
+          commissionType,
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching commission rules:', err);
+    } finally {
+      setLoadingCommission(false);
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -190,6 +244,172 @@ const Profile = () => {
         setUserData(data.user);
         setSuccess(true);
         setSelectedImage(null);
+
+        // Update commission rules if partner type exists
+        if (userData?.companyDetails?.PartnerType) {
+          try {
+            const commissionRulesData = {
+              partnerId: userId,
+              partnerType: userData.companyDetails.PartnerType,
+              isActive: true,
+            };
+
+            // Apply default commission to all commission types
+            const defaultCommission = commissionData.defaultCommission || 2;
+            const commissionType = commissionData.commissionType || 'Percentage';
+
+            if (userData.companyDetails.PartnerType === 'Property') {
+              commissionRulesData.propertyCommission = {
+                saleCommission: {
+                  enabled: true,
+                  commissionBasis: 'Sale Price',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Agreement Signed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                rentCommission: {
+                  enabled: true,
+                  commissionBasis: 'Rent Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Agreement Signed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                installmentCommission: {
+                  enabled: true,
+                  commissionBasis: 'First Installment Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Agreement Signed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+              };
+            } else if (userData.companyDetails.PartnerType === 'Installment') {
+              commissionRulesData.installmentProductCommission = {
+                installmentSaleCommission: {
+                  enabled: true,
+                  commissionBasis: 'Product Cash Price',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Product Delivered',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                cashSaleCommission: {
+                  enabled: true,
+                  commissionBasis: 'Product Cash Price',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Product Delivered',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+              };
+            } else if (userData.companyDetails.PartnerType === 'Loan') {
+              commissionRulesData.loanCommission = {
+                homeLoanCommission: {
+                  enabled: true,
+                  commissionBasis: 'Disbursed Loan Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Loan Disbursed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                personalLoanCommission: {
+                  enabled: true,
+                  commissionBasis: 'Disbursed Loan Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Loan Disbursed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                businessLoanCommission: {
+                  enabled: true,
+                  commissionBasis: 'Disbursed Loan Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Loan Disbursed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                autoLoanCommission: {
+                  enabled: true,
+                  commissionBasis: 'Disbursed Loan Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Loan Disbursed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+              };
+            } else if (userData.companyDetails.PartnerType === 'Insurance') {
+              commissionRulesData.insuranceCommission = {
+                policyIssuanceCommission: {
+                  enabled: true,
+                  commissionBasis: 'Yearly Premium Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Policy Issued',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                claimSettlementCommission: {
+                  enabled: true,
+                  commissionBasis: 'Claim Settlement Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Claim Approved / Settled',
+                  payableAt: 'Claim Settled',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+                policyRenewalCommission: {
+                  enabled: true,
+                  commissionBasis: 'Renewal Premium Amount',
+                  commissionType: commissionType,
+                  commissionValue: defaultCommission,
+                  earnedAt: 'Renewal Completed',
+                  payableAt: 'Deal Closed',
+                  eligibleAgents: 'Verified Agents Only',
+                },
+              };
+            }
+
+            // Check if commission rules exist
+            const checkResponse = await fetch(`${baseApi}/getCommissionRules`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            const checkData = await checkResponse.json();
+            const hasExistingRules = checkData.success && checkData.data;
+
+            // Update commission rules
+            const commissionResponse = await fetch(
+              `${baseApi}${hasExistingRules ? '/updateCommissionRules' : '/createCommissionRules'}`,
+              {
+                method: hasExistingRules ? 'PUT' : 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(commissionRulesData),
+              }
+            );
+
+            if (!commissionResponse.ok) {
+              console.warn('Commission rules could not be updated');
+            }
+          } catch (err) {
+            console.warn('Error updating commission rules:', err);
+          }
+        }
 
         // Scroll to top to show success message
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -465,6 +685,72 @@ const Profile = () => {
                 Select the services you want to manage as a partner
               </p>
             </div>
+
+            {/* Commission Configuration Section */}
+            {userData?.companyDetails?.PartnerType && (
+              <div className="mt-6 pt-6 border-t-2 border-gray-200">
+                <div className="flex items-center gap-3 mb-4">
+                  <CreditCard className="w-5 h-5 text-green-600" />
+                  <h3 className="text-lg font-bold text-gray-900">Commission Configuration</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  Update default commission percentage for agents. This will apply to all commission types for your partner category.
+                </p>
+                
+                {loadingCommission ? (
+                  <div className="flex justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-red-600 border-t-transparent"></div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Default Commission Percentage (%)
+                      </label>
+                      <input
+                        type="number"
+                        value={commissionData.defaultCommission}
+                        onChange={(e) =>
+                          setCommissionData({
+                            ...commissionData,
+                            defaultCommission: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        placeholder="e.g., 2.5"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Default commission that will be applied to all transactions
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Commission Type
+                      </label>
+                      <select
+                        value={commissionData.commissionType}
+                        onChange={(e) =>
+                          setCommissionData({
+                            ...commissionData,
+                            commissionType: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                      >
+                        <option value="Percentage">Percentage (%)</option>
+                        <option value="Fixed Amount">Fixed Amount (PKR)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        How commission is calculated
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

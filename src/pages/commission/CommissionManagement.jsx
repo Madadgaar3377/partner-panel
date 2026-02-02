@@ -57,7 +57,28 @@ const CommissionManagement = () => {
       const filtered = allAssignments.filter(
         (item) => item.partnerId === currentUserId
       );
-      setAssignments(filtered);
+
+      // Fetch agent details for all assignments
+      const assignmentsWithAgentDetails = await Promise.all(
+        filtered.map(async (item) => {
+          if (item.agentId) {
+            try {
+              const agentResponse = await fetch(`${baseApi}/getUserById?userId=${item.agentId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const agentData = await agentResponse.json();
+              if (agentData.success && agentData.data) {
+                return { ...item, agentDetails: agentData.data };
+              }
+            } catch (err) {
+              console.error(`Error fetching agent ${item.agentId}:`, err);
+            }
+          }
+          return item;
+        })
+      );
+
+      setAssignments(assignmentsWithAgentDetails);
     } catch (error) {
       console.error("Error fetching assignments:", error);
       alert("Failed to fetch assignments");
@@ -89,7 +110,17 @@ const CommissionManagement = () => {
       }
 
       const action = modalType === "earned" ? "commissionEarned" : "commissionPayable";
-      const response = await fetch(`${baseApi}/markAsDoneAndCalculateCommission`, {
+      
+      // Ensure no trailing slash in URL
+      const apiUrl = `${baseApi}/markAsDoneAndCalculateCommission`.replace(/\/+$/, '');
+      
+      console.log("Calling API:", apiUrl, {
+        applicationId: selectedAssignment.applicationId,
+        action: action,
+        dealValue: modalType === "earned" ? parseFloat(formData.dealValue) : undefined,
+      });
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -103,6 +134,12 @@ const CommissionManagement = () => {
         }),
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Error Response:", response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+      }
+
       const data = await response.json();
       if (data.success) {
         alert(data.message);
@@ -113,7 +150,7 @@ const CommissionManagement = () => {
       }
     } catch (error) {
       console.error("Error:", error);
-      alert("An error occurred");
+      alert(`An error occurred: ${error.message || "Please check console for details"}`);
     }
   };
 
@@ -261,7 +298,26 @@ const CommissionManagement = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">{item.agentId || "N/A"}</div>
+                      <div className="text-sm font-medium text-gray-900">{item.agentId || "N/A"}</div>
+                      {item.agentDetails && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          <p>{item.agentDetails.name || ""}</p>
+                          <p>{item.agentDetails.email || ""}</p>
+                          {item.agentDetails.phoneNumber && <p>📞 {item.agentDetails.phoneNumber}</p>}
+                          {item.agentDetails.BankAccountinfo && item.agentDetails.BankAccountinfo.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                              <p className="font-bold text-gray-700">Bank Account:</p>
+                              {item.agentDetails.BankAccountinfo.map((account, idx) => (
+                                <div key={idx} className="text-xs">
+                                  <p>{account.bankName || "N/A"}</p>
+                                  <p>Account: {account.accountNumber || "N/A"}</p>
+                                  <p>Name: {account.accountName || "N/A"}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">

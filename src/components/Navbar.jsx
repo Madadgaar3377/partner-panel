@@ -84,6 +84,7 @@ const Navbar = () => {
       items: [
         { label: 'Create Plan', path: '/insurance/create' },
         { label: 'View Plans', path: '/insurance' },
+        { label: 'Applications', path: '/insurance/applications' },
         { label: 'Claims', path: '/insurance/claims' }
       ]
     }

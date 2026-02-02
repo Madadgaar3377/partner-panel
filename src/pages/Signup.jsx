@@ -14,7 +14,26 @@ const Signup = ({ onToggleForm }) => {
     cnicNumber: '',
     Address: '',
     UserType: 'partner',
-    userAccess: []
+    userAccess: [],
+    // Insurance Company Registration Fields (Form 1)
+    insuranceCompanyName: '',
+    companyType: '',
+    secpRegistrationNumber: '',
+    yearOfIncorporation: '',
+    companyWebsite: '',
+    headOfficeAddress: '',
+    city: '',
+    country: 'Pakistan',
+    contactPersonFullName: '',
+    contactPersonDesignation: '',
+    contactPersonOfficialEmail: '',
+    contactPersonOfficialContact: '',
+    contactPersonWhatsApp: '',
+    typesOfInsuranceOffered: [],
+    operationalCities: [],
+    customerSupportContact: '',
+    authorizationToRegister: false,
+    acceptanceOfTerms: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -65,13 +84,47 @@ const Signup = ({ onToggleForm }) => {
       return;
     }
 
+    // Prepare signup data - include insurance company details if Insurance is selected
+    const signupData = { ...formData };
+    
+    if (formData.userAccess.includes('Insurance')) {
+      // Add insurance company details to companyDetails structure
+      signupData.companyDetails = {
+        RegisteredCompanyName: formData.insuranceCompanyName,
+        PartnerType: formData.companyType || 'Insurance',
+        SECPRegistrationNumber: formData.secpRegistrationNumber,
+        HeadOfficeAddress: formData.headOfficeAddress,
+        OfficialWebsite: formData.companyWebsite,
+        AuthorizedContactPerson: [{
+          fullName: formData.contactPersonFullName,
+          Designation: formData.contactPersonDesignation,
+          email: formData.contactPersonOfficialEmail,
+          phoneNumber: formData.contactPersonOfficialContact,
+        }],
+        AuthorizationDeclaration: [
+          { text: 'Authorization to Register Company', isTrue: formData.authorizationToRegister },
+          { text: 'Acceptance of Madadgaar Terms & Privacy Policy', isTrue: formData.acceptanceOfTerms },
+        ],
+      };
+      
+      // Store insurance-specific data for later use
+      signupData.insuranceCompanyData = {
+        typesOfInsuranceOffered: formData.typesOfInsuranceOffered,
+        operationalCities: formData.operationalCities,
+        customerSupportContact: formData.customerSupportContact,
+        yearOfIncorporation: formData.yearOfIncorporation,
+        city: formData.city,
+        country: formData.country || 'Pakistan',
+      };
+    }
+
     try {
       const response = await fetch(`${baseApi}/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(signupData),
       });
 
       const data = await response.json();
@@ -294,6 +347,251 @@ const Signup = ({ onToggleForm }) => {
                 ))}
               </div>
             </div>
+
+            {/* Insurance Company Registration Fields (Form 1) - Show only if Insurance is selected */}
+            {formData.userAccess.includes('Insurance') && (
+              <div className="mt-6 p-6 bg-blue-50 rounded-xl border-2 border-blue-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Insurance Company Registration Details</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Insurance Company Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Insurance Company Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="insuranceCompanyName"
+                      value={formData.insuranceCompanyName}
+                      onChange={handleChange}
+                      required={formData.userAccess.includes('Insurance')}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="ABC Insurance Company"
+                    />
+                  </div>
+
+                  {/* Company Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Company Type *
+                    </label>
+                    <select
+                      name="companyType"
+                      value={formData.companyType}
+                      onChange={handleChange}
+                      required={formData.userAccess.includes('Insurance')}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    >
+                      <option value="">Select Type</option>
+                      <option value="Insurance">Insurance</option>
+                      <option value="Takaful">Takaful</option>
+                    </select>
+                  </div>
+
+                  {/* SECP Registration Number */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      SECP Registration Number *
+                    </label>
+                    <input
+                      type="text"
+                      name="secpRegistrationNumber"
+                      value={formData.secpRegistrationNumber}
+                      onChange={handleChange}
+                      required={formData.userAccess.includes('Insurance')}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="SECP-XXXXX"
+                    />
+                  </div>
+
+                  {/* Year of Incorporation */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Year of Incorporation
+                    </label>
+                    <input
+                      type="number"
+                      name="yearOfIncorporation"
+                      value={formData.yearOfIncorporation}
+                      onChange={handleChange}
+                      min="1900"
+                      max={new Date().getFullYear()}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="2020"
+                    />
+                  </div>
+
+                  {/* Company Website */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Company Website
+                    </label>
+                    <input
+                      type="url"
+                      name="companyWebsite"
+                      value={formData.companyWebsite}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="https://example.com"
+                    />
+                  </div>
+
+                  {/* City */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      City *
+                    </label>
+                    <input
+                      type="text"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                      required={formData.userAccess.includes('Insurance')}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="Karachi"
+                    />
+                  </div>
+
+                  {/* Head Office Address */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Head Office Address *
+                    </label>
+                    <textarea
+                      name="headOfficeAddress"
+                      value={formData.headOfficeAddress}
+                      onChange={handleChange}
+                      required={formData.userAccess.includes('Insurance')}
+                      rows="2"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="Complete address"
+                    />
+                  </div>
+
+                  {/* Contact Person Full Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Contact Person Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="contactPersonFullName"
+                      value={formData.contactPersonFullName}
+                      onChange={handleChange}
+                      required={formData.userAccess.includes('Insurance')}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="John Doe"
+                    />
+                  </div>
+
+                  {/* Contact Person Designation */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Designation *
+                    </label>
+                    <input
+                      type="text"
+                      name="contactPersonDesignation"
+                      value={formData.contactPersonDesignation}
+                      onChange={handleChange}
+                      required={formData.userAccess.includes('Insurance')}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="Manager"
+                    />
+                  </div>
+
+                  {/* Contact Person Official Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Official Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      name="contactPersonOfficialEmail"
+                      value={formData.contactPersonOfficialEmail}
+                      onChange={handleChange}
+                      required={formData.userAccess.includes('Insurance')}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="contact@company.com"
+                    />
+                  </div>
+
+                  {/* Contact Person Official Contact */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Official Contact Number *
+                    </label>
+                    <input
+                      type="tel"
+                      name="contactPersonOfficialContact"
+                      value={formData.contactPersonOfficialContact}
+                      onChange={handleChange}
+                      required={formData.userAccess.includes('Insurance')}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="03XX-XXXXXXX"
+                    />
+                  </div>
+
+                  {/* Types of Insurance Offered */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Types of Insurance Offered * (Select all that apply)
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['Life', 'Health', 'Motor', 'Travel', 'Property', 'Takaful'].map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            const types = formData.typesOfInsuranceOffered;
+                            if (types.includes(type)) {
+                              setFormData({ ...formData, typesOfInsuranceOffered: types.filter(t => t !== type) });
+                            } else {
+                              setFormData({ ...formData, typesOfInsuranceOffered: [...types, type] });
+                            }
+                          }}
+                          className={`py-2 px-3 rounded-lg border-2 transition-all text-sm ${
+                            formData.typesOfInsuranceOffered.includes(type)
+                              ? 'border-red-600 bg-red-50 text-red-700'
+                              : 'border-gray-300 bg-white text-gray-700 hover:border-red-400'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Authorization Checkboxes */}
+                  <div className="md:col-span-2 space-y-3 mt-4">
+                    <label className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.authorizationToRegister}
+                        onChange={(e) => setFormData({ ...formData, authorizationToRegister: e.target.checked })}
+                        required={formData.userAccess.includes('Insurance')}
+                        className="mt-1"
+                      />
+                      <span className="text-sm text-gray-700">
+                        I confirm that I am an authorized representative of the above-mentioned insurance company and request registration on the Madadgaar platform. *
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.acceptanceOfTerms}
+                        onChange={(e) => setFormData({ ...formData, acceptanceOfTerms: e.target.checked })}
+                        required={formData.userAccess.includes('Insurance')}
+                        className="mt-1"
+                      />
+                      <span className="text-sm text-gray-700">
+                        I accept Madadgaar Terms & Privacy Policy *
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Submit Button */}
             <button

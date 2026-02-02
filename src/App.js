@@ -33,6 +33,9 @@ import LoanDetail from './pages/loans/LoanDetail';
 
 // Insurance
 import InsuranceList from './pages/insurance/InsuranceList';
+import CreateInsurancePlan from './pages/insurance/CreateInsurancePlan';
+import InsuranceApplications from './pages/insurance/InsuranceApplications';
+import CompleteInsuranceProfile from './pages/insurance/CompleteInsuranceProfile';
 
 // Commission
 import CommissionConfiguration from './pages/commission/CommissionConfiguration';
@@ -309,7 +312,23 @@ function App() {
           path="/insurance/create"
           element={
             <ProtectedRoute>
-              <InsuranceList />
+              <CreateInsurancePlan />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/insurance/applications"
+          element={
+            <ProtectedRoute>
+              <InsuranceApplications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/insurance/complete-profile"
+          element={
+            <ProtectedRoute>
+              <CompleteInsuranceProfile />
             </ProtectedRoute>
           }
         />

@@ -317,6 +317,22 @@ function App() {
           }
         />
         <Route
+          path="/insurance/edit/:id"
+          element={
+            <ProtectedRoute>
+              <CreateInsurancePlan />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/insurance/view/:id"
+          element={
+            <ProtectedRoute>
+              <CreateInsurancePlan />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/insurance/applications"
           element={
             <ProtectedRoute>

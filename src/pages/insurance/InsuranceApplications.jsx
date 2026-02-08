@@ -43,14 +43,14 @@ const InsuranceApplications = () => {
         return;
       }
 
-      // Get current user to filter by insuranceCompanyId
+      // Get current user to filter by insuranceCompanyId and createdBy
       const userResponse = await fetch(`${baseApi}/getUserById`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const userData = await userResponse.json();
       const currentUserId = userData?.data?.userId;
 
-      // Fetch all applications (admin endpoint, but we'll filter by company)
+      // Fetch all applications
       const response = await fetch(`${baseApi}/getAllInsuranceApplications`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -60,8 +60,35 @@ const InsuranceApplications = () => {
 
       const data = await response.json();
       if (data.success && data.data) {
-        // Filter applications for this partner's plans
-        const filtered = data.data.filter(app => app.insuranceCompanyId === currentUserId);
+        // First, get all plans created by this partner to filter efficiently
+        const plansResponse = await fetch(`${baseApi}/getMyInsurancePlans`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        const plansData = await plansResponse.json();
+        const partnerPlanIds = plansData.success && plansData.data 
+          ? plansData.data.map(plan => plan._id.toString())
+          : [];
+
+        // Filter applications for plans created by this partner
+        // A partner should see applications for plans where:
+        // 1. insuranceCompanyId matches (plan belongs to partner's company), OR
+        // 2. planId is in the list of plans created by this partner
+        const filtered = data.data.filter(app => {
+          // Check if application's insuranceCompanyId matches
+          if (app.insuranceCompanyId === currentUserId) {
+            return true;
+          }
+          
+          // Check if the plan was created by this partner
+          if (app.planId && partnerPlanIds.includes(app.planId.toString())) {
+            return true;
+          }
+          
+          return false;
+        });
+        
         setApplications(filtered);
       } else {
         setApplications([]);

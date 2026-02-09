@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -19,6 +19,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import RichTextEditor from '../../components/RichTextEditor';
+import { getAuthHeaders, isAuthenticated, clearUserSession, getToken } from '../../utils/auth';
 
 const CreateInsurancePlan = () => {
   const navigate = useNavigate();
@@ -104,10 +105,10 @@ const CreateInsurancePlan = () => {
       theftCoverage: false,
       floodCoverage: false,
       naturalCalamities: false,
+      thirdPartyCoverage: [],
+      totalLossCoverage: [],
+      ownDamageCoverage: [],
       annualPremium: '',
-      deductibleExcess: '',
-      claimProcessType: '',
-      averageClaimTATDays: '',
       requiredDocuments: [],
     },
     
@@ -174,35 +175,20 @@ const CreateInsurancePlan = () => {
     tags: [],
   });
 
-  useEffect(() => {
-    const storedUserData = localStorage.getItem('userData');
-    if (storedUserData) {
-      try {
-        const parsed = JSON.parse(storedUserData);
-        setUserData(parsed);
-        // Set default insurance company ID to current user
-        if (parsed.userId) {
-          setFormData(prev => ({ ...prev, insuranceCompanyId: parsed.userId }));
-        }
-      } catch (err) {
-        console.error('Error parsing user data:', err);
-      }
-    }
-    if (!isEdit) {
-      fetchInsuranceCompanies();
-    } else {
-      fetchPlanDetails();
-    }
-  }, [id, isEdit]);
-
-  const fetchPlanDetails = async () => {
+  const fetchPlanDetails = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('userToken');
+      
+      // Check authentication
+      if (!isAuthenticated()) {
+        clearUserSession();
+        navigate('/');
+        return;
+      }
+      
+      const headers = getAuthHeaders();
       const response = await fetch(`${baseApi}/getInsurancePlan/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        }
+        headers: headers,
       });
       const data = await response.json();
       if (data.success) {
@@ -224,16 +210,21 @@ const CreateInsurancePlan = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
 
-  const fetchInsuranceCompanies = async () => {
+  const fetchInsuranceCompanies = useCallback(async () => {
     try {
-      const token = localStorage.getItem('userToken');
+      // Check authentication
+      if (!isAuthenticated()) {
+        clearUserSession();
+        navigate('/');
+        return;
+      }
+      
+      const headers = getAuthHeaders();
       // Fetch all insurance companies by setting a high limit (1000 should be enough for all companies)
       const response = await fetch(`${baseApi}/getAllPartners?limit=1000`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: headers,
       });
       const data = await response.json();
       if (data.success && data.data) {
@@ -248,7 +239,28 @@ const CreateInsurancePlan = () => {
     } catch (err) {
       console.error('Error fetching insurance companies:', err);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    const storedUserData = localStorage.getItem('userData');
+    if (storedUserData) {
+      try {
+        const parsed = JSON.parse(storedUserData);
+        setUserData(parsed);
+        // Set default insurance company ID to current user
+        if (parsed.userId) {
+          setFormData(prev => ({ ...prev, insuranceCompanyId: parsed.userId }));
+        }
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+      }
+    }
+    if (!isEdit) {
+      fetchInsuranceCompanies();
+    } else {
+      fetchPlanDetails();
+    }
+  }, [id, isEdit, fetchInsuranceCompanies, fetchPlanDetails]);
 
   const handleInput = (e) => {
     const { name, value, type, checked } = e.target;
@@ -259,6 +271,18 @@ const CreateInsurancePlan = () => {
     const { name, value, type, checked } = e.target;
     const policyType = formData.policyType;
     const policyKey = `${policyType.charAt(0).toLowerCase() + policyType.slice(1)}${policyType === 'Takaful' ? '' : 'Insurance'}Plan`;
+    
+    // Handle array fields (for coverage checklists)
+    if (Array.isArray(value)) {
+      setFormData(prev => ({
+        ...prev,
+        [policyKey]: {
+          ...prev[policyKey],
+          [name]: value,
+        }
+      }));
+      return;
+    }
     
     setFormData(prev => ({
       ...prev,
@@ -319,7 +343,14 @@ const CreateInsurancePlan = () => {
       const formDataUpload = new FormData();
       formDataUpload.append('image', file);
       
-      const token = localStorage.getItem('userToken');
+      // Check authentication
+      if (!isAuthenticated()) {
+        clearUserSession();
+        navigate('/');
+        return;
+      }
+      
+      const token = getToken();
       const response = await fetch(`${baseApi}/upload-image`, {
         method: 'POST',
         headers: {
@@ -366,7 +397,14 @@ const CreateInsurancePlan = () => {
       const formDataUpload = new FormData();
       formDataUpload.append('document', file);
       
-      const token = localStorage.getItem('userToken');
+      // Check authentication
+      if (!isAuthenticated()) {
+        clearUserSession();
+        navigate('/');
+        return;
+      }
+      
+      const token = getToken();
       const xhr = new XMLHttpRequest();
 
       // Track upload progress
@@ -448,13 +486,17 @@ const CreateInsurancePlan = () => {
     }
 
     try {
-      const token = localStorage.getItem('userToken');
+      // Check authentication
+      if (!isAuthenticated()) {
+        clearUserSession();
+        navigate('/');
+        return;
+      }
+      
+      const headers = getAuthHeaders();
       const response = await fetch(`${baseApi}/delete-document`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: headers,
         body: JSON.stringify({ fileUrl }),
       });
 
@@ -521,7 +563,14 @@ const CreateInsurancePlan = () => {
       
       // planId will be auto-generated by the backend if not provided
 
-      const token = localStorage.getItem('userToken');
+      // Check authentication
+      if (!isAuthenticated()) {
+        clearUserSession();
+        navigate('/');
+        return;
+      }
+      
+      const headers = getAuthHeaders();
       const url = isEdit 
         ? `${baseApi}/updateInsurancePlan/${id}`
         : `${baseApi}/createInsurancePlan`;
@@ -530,10 +579,7 @@ const CreateInsurancePlan = () => {
       
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: headers,
         body: JSON.stringify(payload),
       });
 
@@ -560,27 +606,37 @@ const CreateInsurancePlan = () => {
       return formData.planName && formData.policyType;
     }
     if (step === 2) {
-      // Check common fields first
-      if (!formData.policyTerm || !formData.eligibleAge?.min || !formData.eligibleAge?.max || !formData.estimatedMaturity) {
-        return false;
-      }
       const policyType = formData.policyType;
       const policyKey = `${policyType.charAt(0).toLowerCase() + policyType.slice(1)}${policyType === 'Takaful' ? '' : 'Insurance'}Plan`;
       const policyData = formData[policyKey];
       
+      // Check common fields (except for Motor)
+      if (policyType !== 'Motor') {
+        if (!formData.policyTerm || !formData.eligibleAge?.min || !formData.eligibleAge?.max || !formData.estimatedMaturity) {
+          return false;
+        }
+      }
+      
       if (policyType === 'Life') {
-        // Check static fields: Premium Amount, Payment Frequency, Sum Assured, Policy Term, Estimated Maturity
-        // Note: minEntryAge and maxEntryAge removed
+        // Check all required Life Insurance fields
         return policyData.planSubType && 
                policyData.sumAssured && 
+               policyData.premiumPaymentTerm &&
+               policyData.minEntryAge &&
+               policyData.maxEntryAge &&
+               policyData.maturityBenefit !== undefined &&
+               policyData.deathBenefitDescription &&
+               policyData.medicalRequirement &&
                policyData.premiumAmount && 
                policyData.paymentFrequency &&
+               policyData.claimType &&
+               policyData.maturityProcessingTimeDays &&
                formData.policyTerm &&
                formData.estimatedMaturity;
       } else if (policyType === 'Health') {
         return policyData.coverageType && policyData.annualCoverageLimit && policyData.annualPremium;
       } else if (policyType === 'Motor') {
-        return policyData.motorType && policyData.coverageType && policyData.annualPremium;
+        return policyData.motorType && policyData.coverageType && policyData.vehicleValueRangeMin && policyData.vehicleValueRangeMax && policyData.annualPremium;
       } else if (policyType === 'Travel') {
         return policyData.travelType && policyData.geographicCoverage && policyData.premiumAmount;
       } else if (policyType === 'Property') {
@@ -591,7 +647,8 @@ const CreateInsurancePlan = () => {
       return false;
     }
     if (step === 3) {
-      return formData.planDocuments.productBrochure;
+      // Product Brochure and Policy Wording are required
+      return formData.planDocuments.productBrochure && formData.planDocuments.policyWording;
     }
     if (step === 4) {
       return true; // Image is optional
@@ -639,6 +696,50 @@ const CreateInsurancePlan = () => {
               </select>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Premium Payment Term (Years) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                name="premiumPaymentTerm"
+                value={policyData.premiumPaymentTerm}
+                onChange={handlePolicyTypeInput}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="e.g., 10"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Min Entry Age <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                name="minEntryAge"
+                value={policyData.minEntryAge}
+                onChange={handlePolicyTypeInput}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="e.g., 18"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Max Entry Age <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                name="maxEntryAge"
+                value={policyData.maxEntryAge}
+                onChange={handlePolicyTypeInput}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="e.g., 65"
+                required
+              />
+            </div>
 
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -670,6 +771,28 @@ const CreateInsurancePlan = () => {
               />
             </div>
 
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Riders Available (Optional)
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {['Accidental Death', 'Critical Illness', 'Disability', 'Waiver of Premium', 'Term Rider', 'Income Benefit', 'Hospital Cash', 'Other'].map((rider) => (
+                  <label key={rider} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={policyData.ridersAvailable?.includes(rider) || false}
+                      onChange={() => handleArrayToggle('ridersAvailable', rider, true)}
+                      className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">{rider}</span>
+                  </label>
+                ))}
+              </div>
+              {policyData.ridersAvailable?.length > 0 && (
+                <p className="mt-2 text-xs text-gray-500">Selected: {policyData.ridersAvailable.join(', ')}</p>
+              )}
+            </div>
+
             <div className="md:col-span-2 flex gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -679,7 +802,7 @@ const CreateInsurancePlan = () => {
                   onChange={handlePolicyTypeInput}
                   className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                 />
-                <span className="text-sm font-medium text-gray-700">Maturity Benefit Offered</span>
+                <span className="text-sm font-medium text-gray-700">Maturity Benefit <span className="text-red-500">*</span></span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -689,7 +812,7 @@ const CreateInsurancePlan = () => {
                   onChange={handlePolicyTypeInput}
                   className="w-5 h-5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                 />
-                <span className="text-sm font-medium text-gray-700">Bonus Applicable</span>
+                <span className="text-sm font-medium text-gray-700">Bonus Applicable (Optional)</span>
               </label>
             </div>
 
@@ -943,41 +1066,6 @@ const CreateInsurancePlan = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Motor Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="motorType"
-                value={policyData.motorType}
-                onChange={handlePolicyTypeInput}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select Motor Type</option>
-                <option value="Car">Car</option>
-                <option value="Bike">Bike</option>
-                <option value="Commercial">Commercial</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Coverage Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="coverageType"
-                value={policyData.coverageType}
-                onChange={handlePolicyTypeInput}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select Coverage Type</option>
-                <option value="Comprehensive">Comprehensive</option>
-                <option value="Third Party">Third Party</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Min Vehicle Value <span className="text-red-500">*</span>
               </label>
               <input
@@ -998,20 +1086,6 @@ const CreateInsurancePlan = () => {
                 type="number"
                 name="vehicleValueRangeMax"
                 value={policyData.vehicleValueRangeMax}
-                onChange={handlePolicyTypeInput}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Annual Premium <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                name="annualPremium"
-                value={policyData.annualPremium}
                 onChange={handlePolicyTypeInput}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 required
@@ -1711,19 +1785,20 @@ const CreateInsurancePlan = () => {
               <div className="bg-gradient-to-br from-blue-50 to-orange-50 border-l-4 border-orange-500 p-6 rounded-lg mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Plan Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Policy Term - Common for all */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Policy Term <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="policyTerm"
-                      value={formData.policyTerm}
-                      onChange={handleInput}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
-                      required
-                    >
-                      <option value="">Select Policy Term</option>
+                  {/* Policy Term - Common for all (except Motor) */}
+                  {formData.policyType !== 'Motor' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Policy Term <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="policyTerm"
+                        value={formData.policyTerm}
+                        onChange={handleInput}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                        required
+                      >
+                        <option value="">Select Policy Term</option>
                       <option value="1 year">1 year</option>
                       <option value="2 years">2 years</option>
                       <option value="3 years">3 years</option>
@@ -1742,6 +1817,7 @@ const CreateInsurancePlan = () => {
                       <option value="Custom">Custom</option>
                     </select>
                   </div>
+                  )}
 
                   {/* For Life Insurance - Static Fields */}
                   {formData.policyType === 'Life' && (
@@ -1814,8 +1890,228 @@ const CreateInsurancePlan = () => {
                     </>
                   )}
 
+                  {/* For Motor Insurance - Static Fields */}
+                  {formData.policyType === 'Motor' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Motor Type <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="motorType"
+                          value={formData.motorInsurancePlan?.motorType || ''}
+                          onChange={handlePolicyTypeInput}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                          required
+                        >
+                          <option value="">Select Motor Type</option>
+                          <option value="Car">Car</option>
+                          <option value="Bike">Bike</option>
+                          <option value="Commercial">Commercial</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Coverage Type <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="coverageType"
+                          value={formData.motorInsurancePlan?.coverageType || ''}
+                          onChange={handlePolicyTypeInput}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                          required
+                        >
+                          <option value="">Select Coverage Type</option>
+                          <option value="Comprehensive">Comprehensive</option>
+                          <option value="Third Party">Third Party</option>
+                        </select>
+                      </div>
+
+                      {/* Motor Insurance Coverage Checklists */}
+                      <div className="md:col-span-2 space-y-4">
+                        {/* Third Party Coverage */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Third Party Insurance Coverage
+                          </label>
+                          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {[
+                                'Property Damage Liability',
+                                'Bodily Injury Liability',
+                                'Accidental Death',
+                                'Compensation for Pain and Suffering',
+                                'Third Party Property Repair',
+                                'Court Costs and Settlements',
+                                'Funeral Costs'
+                              ].map((coverage) => (
+                                <label key={coverage} className="flex items-start gap-3 cursor-pointer hover:bg-purple-100 p-3 rounded-lg transition-all border border-transparent hover:border-purple-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.motorInsurancePlan?.thirdPartyCoverage?.includes(coverage) || false}
+                                    onChange={() => {
+                                      const current = formData.motorInsurancePlan?.thirdPartyCoverage || [];
+                                      const updated = current.includes(coverage)
+                                        ? current.filter(c => c !== coverage)
+                                        : [...current, coverage];
+                                      handlePolicyTypeInput({
+                                        target: {
+                                          name: 'thirdPartyCoverage',
+                                          value: updated
+                                        }
+                                      });
+                                    }}
+                                    className="mt-0.5 w-5 h-5 text-purple-600 border-2 border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 cursor-pointer accent-purple-600"
+                                  />
+                                  <span className="text-sm font-medium text-gray-700 flex-1 leading-tight">{coverage}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Total Loss Coverage */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Total Loss Coverage
+                          </label>
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {[
+                                'Actual Cash Value',
+                                'Parts Replacement Cost',
+                                'Comprehensive Coverage',
+                                'Towing and Storage Fees',
+                                'Rental Car Reimbursement',
+                                'Personal Belongings',
+                                'Deductibles'
+                              ].map((coverage) => (
+                                <label key={coverage} className="flex items-start gap-3 cursor-pointer hover:bg-blue-100 p-3 rounded-lg transition-all border border-transparent hover:border-blue-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.motorInsurancePlan?.totalLossCoverage?.includes(coverage) || false}
+                                    onChange={() => {
+                                      const current = formData.motorInsurancePlan?.totalLossCoverage || [];
+                                      const updated = current.includes(coverage)
+                                        ? current.filter(c => c !== coverage)
+                                        : [...current, coverage];
+                                      handlePolicyTypeInput({
+                                        target: {
+                                          name: 'totalLossCoverage',
+                                          value: updated
+                                        }
+                                      });
+                                    }}
+                                    className="mt-0.5 w-5 h-5 text-blue-600 border-2 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer accent-blue-600"
+                                  />
+                                  <span className="text-sm font-medium text-gray-700 flex-1 leading-tight">{coverage}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Own Damage Coverage */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Own Damage Coverage
+                          </label>
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {[
+                                'Comprehensive Coverage',
+                                'Theft & Total Loss',
+                                'Third Party Liability',
+                                'Accidental External Means',
+                                'Personal Accident Coverage',
+                                'Riots, Strikes & Malicious Damages',
+                                'Fire, External Explosion, Self Ignition'
+                              ].map((coverage) => (
+                                <label key={coverage} className="flex items-start gap-3 cursor-pointer hover:bg-green-100 p-3 rounded-lg transition-all border border-transparent hover:border-green-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.motorInsurancePlan?.ownDamageCoverage?.includes(coverage) || false}
+                                    onChange={() => {
+                                      const current = formData.motorInsurancePlan?.ownDamageCoverage || [];
+                                      const updated = current.includes(coverage)
+                                        ? current.filter(c => c !== coverage)
+                                        : [...current, coverage];
+                                      handlePolicyTypeInput({
+                                        target: {
+                                          name: 'ownDamageCoverage',
+                                          value: updated
+                                        }
+                                      });
+                                    }}
+                                    className="mt-0.5 w-5 h-5 text-green-600 border-2 border-gray-300 rounded focus:ring-2 focus:ring-green-500 focus:ring-offset-2 cursor-pointer accent-green-600"
+                                  />
+                                  <span className="text-sm font-medium text-gray-700 flex-1 leading-tight">{coverage}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vehicle Value Range (Min) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">PKR</span>
+                          <input
+                            type="number"
+                            name="vehicleValueRangeMin"
+                            value={formData.motorInsurancePlan?.vehicleValueRangeMin || ''}
+                            onChange={handlePolicyTypeInput}
+                            className="w-full pl-16 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                            placeholder="Min value"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vehicle Value Range (Max) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">PKR</span>
+                          <input
+                            type="number"
+                            name="vehicleValueRangeMax"
+                            value={formData.motorInsurancePlan?.vehicleValueRangeMax || ''}
+                            onChange={handlePolicyTypeInput}
+                            className="w-full pl-16 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                            placeholder="Max value"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Annual Premium <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">PKR</span>
+                          <input
+                            type="number"
+                            name="annualPremium"
+                            value={formData.motorInsurancePlan?.annualPremium || ''}
+                            onChange={handlePolicyTypeInput}
+                            className="w-full pl-16 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                            placeholder="Enter annual premium"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   {/* Estimated Maturity - For non-Life insurance types */}
-                  {formData.policyType !== 'Life' && (
+                  {formData.policyType !== 'Life' && formData.policyType !== 'Motor' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Estimated Maturity <span className="text-red-500">*</span>
@@ -1971,6 +2267,36 @@ const CreateInsurancePlan = () => {
                 </div>
               )}
 
+              {/* Display Cards for Motor Insurance Static Fields */}
+              {formData.policyType === 'Motor' && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-white border-2 border-purple-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-xs text-gray-500 mb-1">Motor Type</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      {formData.motorInsurancePlan?.motorType || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="bg-white border-2 border-purple-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-xs text-gray-500 mb-1">Coverage Type</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      {formData.motorInsurancePlan?.coverageType || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="bg-white border-2 border-purple-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-xs text-gray-500 mb-1">Vehicle Value Range</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      PKR {formData.motorInsurancePlan?.vehicleValueRangeMin ? Number(formData.motorInsurancePlan.vehicleValueRangeMin).toLocaleString() : '0'} - {formData.motorInsurancePlan?.vehicleValueRangeMax ? Number(formData.motorInsurancePlan.vehicleValueRangeMax).toLocaleString() : '0'}
+                    </p>
+                  </div>
+                  <div className="bg-white border-2 border-purple-200 rounded-xl p-4 shadow-sm">
+                    <p className="text-xs text-gray-500 mb-1">Annual Premium</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      PKR {formData.motorInsurancePlan?.annualPremium ? Number(formData.motorInsurancePlan.annualPremium).toLocaleString() : '0'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Policy-Specific Fields (excluding Life Insurance static fields) */}
               {renderPolicyTypeFields()}
             </div>
@@ -1988,22 +2314,46 @@ const CreateInsurancePlan = () => {
               </div>
               
               <div className="space-y-6">
-                <div className="border border-gray-200 rounded-lg p-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                {/* Product Brochure - Required */}
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-orange-400 transition-all">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Product Brochure <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => {
-                      if (e.target.files[0]) {
-                        handleDocumentUpload(e.target.files[0], 'productBrochure');
-                      }
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    required
-                  />
-                  {formData.planDocuments.productBrochure && (
+                  <p className="text-xs text-gray-500 mb-2">File types: PDF, DOC, DOCX | Max size: 5MB</p>
+                  {!formData.planDocuments.productBrochure ? (
+                    <>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => {
+                          if (e.target.files[0]) {
+                            handleDocumentUpload(e.target.files[0], 'productBrochure');
+                          }
+                        }}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        required
+                        disabled={uploadingDocuments.productBrochure}
+                      />
+                      {uploadingDocuments.productBrochure && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-blue-700">Uploading...</span>
+                            <span className="text-sm font-semibold text-blue-900">{Math.round(uploadProgress.productBrochure || 0)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div 
+                              className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                              style={{ width: `${uploadProgress.productBrochure || 0}%` }}
+                            >
+                              {uploadProgress.productBrochure > 10 && (
+                                <span className="text-xs text-white font-medium">{Math.round(uploadProgress.productBrochure || 0)}%</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
                     <div className="mt-3 flex items-center gap-2 text-green-600">
                       <Check className="w-5 h-5" />
                       <span className="text-sm font-medium">Document uploaded successfully</span>
@@ -2013,63 +2363,112 @@ const CreateInsurancePlan = () => {
                       <button
                         type="button"
                         onClick={() => handleDeleteDocument('productBrochure')}
-                        className="ml-auto text-red-600 hover:text-red-800 flex items-center gap-1"
+                        className="ml-auto px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-800 rounded-lg flex items-center gap-1.5 transition-colors border border-red-200"
                       >
                         <Trash2 className="w-4 h-4" />
-                        <span className="text-sm">Delete</span>
+                        <span className="text-sm font-medium">Delete</span>
                       </button>
                     </div>
                   )}
                 </div>
 
-                <div className="border border-gray-200 rounded-lg p-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Rate Card <span className="text-gray-500">(Optional)</span>
+                {/* Policy Wording - Required */}
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-orange-400 transition-all">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Policy Wording <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx"
-                    onChange={(e) => {
-                      if (e.target.files[0]) {
-                        handleDocumentUpload(e.target.files[0], 'rateCard');
-                      }
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  />
-                  {formData.planDocuments.rateCard && (
+                  <p className="text-xs text-gray-500 mb-2">File types: PDF, DOC, DOCX | Max size: 5MB</p>
+                  {!formData.planDocuments.policyWording ? (
+                    <>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => {
+                          if (e.target.files[0]) {
+                            handleDocumentUpload(e.target.files[0], 'policyWording');
+                          }
+                        }}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        required
+                        disabled={uploadingDocuments.policyWording}
+                      />
+                      {uploadingDocuments.policyWording && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-blue-700">Uploading...</span>
+                            <span className="text-sm font-semibold text-blue-900">{Math.round(uploadProgress.policyWording || 0)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div 
+                              className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                              style={{ width: `${uploadProgress.policyWording || 0}%` }}
+                            >
+                              {uploadProgress.policyWording > 10 && (
+                                <span className="text-xs text-white font-medium">{Math.round(uploadProgress.policyWording || 0)}%</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
                     <div className="mt-3 flex items-center gap-2 text-green-600">
                       <Check className="w-5 h-5" />
                       <span className="text-sm font-medium">Document uploaded successfully</span>
-                      <a href={formData.planDocuments.rateCard} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                      <a href={formData.planDocuments.policyWording} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
                         View
                       </a>
                       <button
                         type="button"
-                        onClick={() => handleDeleteDocument('rateCard')}
-                        className="ml-auto text-red-600 hover:text-red-800 flex items-center gap-1"
+                        onClick={() => handleDeleteDocument('policyWording')}
+                        className="ml-auto px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-800 rounded-lg flex items-center gap-1.5 transition-colors border border-red-200"
                       >
                         <Trash2 className="w-4 h-4" />
-                        <span className="text-sm">Delete</span>
+                        <span className="text-sm font-medium">Delete</span>
                       </button>
                     </div>
                   )}
                 </div>
 
-                <div className="border border-gray-200 rounded-lg p-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Claim Procedure (Optional)
+                {/* Claim Procedure - Optional */}
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 hover:border-orange-400 transition-all">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Claim Procedure <span className="text-gray-500">(Optional)</span>
                   </label>
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => {
-                      if (e.target.files[0]) {
-                        handleDocumentUpload(e.target.files[0], 'claimProcedure');
-                      }
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  />
-                  {formData.planDocuments.claimProcedure && (
+                  <p className="text-xs text-gray-500 mb-2">File types: PDF, DOC, DOCX | Max size: 5MB</p>
+                  {!formData.planDocuments.claimProcedure ? (
+                    <>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={(e) => {
+                          if (e.target.files[0]) {
+                            handleDocumentUpload(e.target.files[0], 'claimProcedure');
+                          }
+                        }}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        disabled={uploadingDocuments.claimProcedure}
+                      />
+                      {uploadingDocuments.claimProcedure && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-blue-700">Uploading...</span>
+                            <span className="text-sm font-semibold text-blue-900">{Math.round(uploadProgress.claimProcedure || 0)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div 
+                              className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 flex items-center justify-end pr-2"
+                              style={{ width: `${uploadProgress.claimProcedure || 0}%` }}
+                            >
+                              {uploadProgress.claimProcedure > 10 && (
+                                <span className="text-xs text-white font-medium">{Math.round(uploadProgress.claimProcedure || 0)}%</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
                     <div className="mt-3 flex items-center gap-2 text-green-600">
                       <Check className="w-5 h-5" />
                       <span className="text-sm font-medium">Document uploaded successfully</span>
@@ -2079,10 +2478,10 @@ const CreateInsurancePlan = () => {
                       <button
                         type="button"
                         onClick={() => handleDeleteDocument('claimProcedure')}
-                        className="ml-auto text-red-600 hover:text-red-800 flex items-center gap-1"
+                        className="ml-auto px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-800 rounded-lg flex items-center gap-1.5 transition-colors border border-red-200"
                       >
                         <Trash2 className="w-4 h-4" />
-                        <span className="text-sm">Delete</span>
+                        <span className="text-sm font-medium">Delete</span>
                       </button>
                     </div>
                   )}
@@ -2246,7 +2645,39 @@ const CreateInsurancePlan = () => {
                     setStep(step + 1);
                     setError(null);
                   } else {
-                    setError('Please fill in all required fields');
+                    // Provide specific error messages based on step
+                    if (step === 1) {
+                      setError('Please fill in Plan Name and Policy Type');
+                    } else if (step === 2) {
+                      const policyType = formData.policyType;
+                      if (policyType === 'Life') {
+                        setError('Please fill in all required Life Insurance fields');
+                      } else if (policyType === 'Health') {
+                        setError('Please fill in all required Health Insurance fields');
+                      } else if (policyType === 'Motor') {
+                        setError('Please fill in all required Motor Insurance fields');
+                      } else if (policyType === 'Travel') {
+                        setError('Please fill in all required Travel Insurance fields');
+                      } else if (policyType === 'Property') {
+                        setError('Please fill in all required Property Insurance fields');
+                      } else if (policyType === 'Takaful') {
+                        setError('Please fill in all required Takaful fields');
+                      } else {
+                        setError('Please fill in all required fields for this policy type');
+                      }
+                    } else if (step === 3) {
+                      if (!formData.planDocuments.productBrochure && !formData.planDocuments.policyWording) {
+                        setError('Please upload Product Brochure and Policy Wording');
+                      } else if (!formData.planDocuments.productBrochure) {
+                        setError('Please upload Product Brochure');
+                      } else if (!formData.planDocuments.policyWording) {
+                        setError('Please upload Policy Wording');
+                      } else {
+                        setError('Please upload all required documents');
+                      }
+                    } else {
+                      setError('Please fill in all required fields');
+                    }
                   }
                 }}
                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800 transition-all shadow-lg"

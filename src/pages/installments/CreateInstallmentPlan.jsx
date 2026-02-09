@@ -50,7 +50,7 @@ const CreateInstallmentPlan = () => {
         companyNameOther: "",
         category: "",
         customCategory: "",
-        status: "pending",
+        status: "approved",
         productImages: [],
         paymentPlans: [{ ...defaultPlan }],
 

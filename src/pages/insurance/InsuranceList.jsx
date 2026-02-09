@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Shield, Eye, Edit, Trash2, Search, Filter, Users, TrendingUp, User, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import { PageLoader } from '../../components/Loader';
 import baseApi from '../../constants/apiUrl';
+import { getAuthHeaders, isAuthenticated, clearUserSession } from '../../utils/auth';
 
 const InsuranceList = () => {
   const navigate = useNavigate();
@@ -16,22 +17,23 @@ const InsuranceList = () => {
   const [applicationsCount, setApplicationsCount] = useState({});
   const [creatorInfo, setCreatorInfo] = useState({});
 
-  useEffect(() => {
-    fetchPlans();
-  }, []);
-
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem('userToken');
+      
+      // Check authentication
+      if (!isAuthenticated()) {
+        clearUserSession();
+        navigate('/');
+        return;
+      }
+      
+      const headers = getAuthHeaders();
       
       // Fetch plans
       const response = await fetch(`${baseApi}/getMyInsurancePlans`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       });
 
       const data = await response.json();
@@ -41,10 +43,7 @@ const InsuranceList = () => {
 
         // Fetch applications count for each plan
         const applicationsResponse = await fetch(`${baseApi}/getAllInsuranceApplications`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: headers,
         });
         
         const applicationsData = await applicationsResponse.json();
@@ -82,18 +81,27 @@ const InsuranceList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    fetchPlans();
+  }, [fetchPlans]);
 
   const handleDelete = async (planId) => {
     if (!window.confirm('Are you sure you want to delete this plan?')) return;
 
     try {
-      const token = localStorage.getItem('userToken');
+      // Check authentication
+      if (!isAuthenticated()) {
+        clearUserSession();
+        navigate('/');
+        return;
+      }
+      
+      const headers = getAuthHeaders();
       const response = await fetch(`${baseApi}/deleteInsurancePlan/${planId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: headers,
       });
 
       const data = await response.json();

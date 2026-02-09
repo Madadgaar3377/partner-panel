@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Users, 
   FileText, 
   User, 
   Mail, 
@@ -8,15 +7,14 @@ import {
   MapPin,
   Shield,
   Eye,
-  CheckCircle,
   XCircle,
   Clock,
-  Search,
-  Filter
+  Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
+import { getAuthHeaders, isAuthenticated, clearUserSession, getUserData } from '../../utils/auth';
 
 const InsuranceApplications = () => {
   const navigate = useNavigate();
@@ -28,43 +26,39 @@ const InsuranceApplications = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPolicyType, setFilterPolicyType] = useState('all');
 
-  useEffect(() => {
-    fetchApplications();
-  }, []);
-
-  const fetchApplications = async () => {
+  const fetchApplications = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      const token = localStorage.getItem('userToken');
       
-      if (!token) {
+      // Check authentication
+      if (!isAuthenticated()) {
+        clearUserSession();
         navigate('/');
         return;
       }
+      
+      const headers = getAuthHeaders();
+      const userData = getUserData();
+      const currentUserId = userData?.userId;
 
       // Get current user to filter by insuranceCompanyId and createdBy
       const userResponse = await fetch(`${baseApi}/getUserById`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: headers,
       });
-      const userData = await userResponse.json();
-      const currentUserId = userData?.data?.userId;
+      const userResponseData = await userResponse.json();
+      const userId = userResponseData?.data?.userId || currentUserId;
 
       // Fetch all applications
       const response = await fetch(`${baseApi}/getAllInsuranceApplications`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       });
 
       const data = await response.json();
       if (data.success && data.data) {
         // First, get all plans created by this partner to filter efficiently
         const plansResponse = await fetch(`${baseApi}/getMyInsurancePlans`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: headers,
         });
         const plansData = await plansResponse.json();
         const partnerPlanIds = plansData.success && plansData.data 
@@ -77,7 +71,7 @@ const InsuranceApplications = () => {
         // 2. planId is in the list of plans created by this partner
         const filtered = data.data.filter(app => {
           // Check if application's insuranceCompanyId matches
-          if (app.insuranceCompanyId === currentUserId) {
+          if (app.insuranceCompanyId === userId) {
             return true;
           }
           
@@ -100,7 +94,11 @@ const InsuranceApplications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    fetchApplications();
+  }, [fetchApplications]);
 
   const getStatusBadge = (status) => {
     const badges = {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
+import LoginWithToken from './pages/LoginWithToken';
 import { isAuthenticated, isSessionExpired, clearUserSession, getUserData } from './utils/auth';
 import Signup from './pages/Signup';
 import ForgetPassword from './pages/ForgetPassword';
@@ -45,13 +46,19 @@ import CommissionManagement from './pages/commission/CommissionManagement';
 import MyAgents from './pages/agents/MyAgents';
 import AddAgents from './pages/agents/AddAgents';
 
-// Auth Page Component (handles login/signup toggle)
+// Auth Page Component (handles login/signup toggle, or login-with-token from main site)
 const AuthPage = () => {
+  const location = useLocation();
   const [showLogin, setShowLogin] = useState(true);
+  const tokenFromUrl = new URLSearchParams(location.search).get('token');
 
   const toggleForm = () => {
     setShowLogin(!showLogin);
   };
+
+  if (tokenFromUrl && tokenFromUrl.trim()) {
+    return <LoginWithToken />;
+  }
 
   return showLogin ? (
     <Login onToggleForm={toggleForm} />

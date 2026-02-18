@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LogOut, 
   User, 
+  Users,
   Settings,
   Home,
   FileText,
@@ -90,9 +91,21 @@ const Navbar = () => {
     }
   };
 
-  // Get available menus based on user access
+  // Agents menu: all partners can link their own agents for auto-assignment
+  const agentsMenu = {
+    icon: Users,
+    label: 'Agents',
+    color: 'indigo',
+    items: [
+      { label: 'My Agents', path: '/agents' },
+      { label: 'Add Agents', path: '/agents/add' }
+    ]
+  };
+
+  // Get available menus based on user access + always show Agents
   const availableMenus = [
-    ...(userData.userAccess?.map(access => accessMenus[access]).filter(Boolean) || [])
+    ...(userData.userAccess?.map(access => accessMenus[access]).filter(Boolean) || []),
+    agentsMenu
   ];
 
   const toggleDropdown = (label) => {

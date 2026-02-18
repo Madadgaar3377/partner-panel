@@ -41,6 +41,10 @@ import CompleteInsuranceProfile from './pages/insurance/CompleteInsuranceProfile
 import CommissionConfiguration from './pages/commission/CommissionConfiguration';
 import CommissionManagement from './pages/commission/CommissionManagement';
 
+// Partner's agents
+import MyAgents from './pages/agents/MyAgents';
+import AddAgents from './pages/agents/AddAgents';
+
 // Auth Page Component (handles login/signup toggle)
 const AuthPage = () => {
   const [showLogin, setShowLogin] = useState(true);
@@ -371,6 +375,24 @@ function App() {
           element={
             <ProtectedRoute>
               <CommissionManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Partner's agents - link agents for auto-assignment on orders */}
+        <Route
+          path="/agents"
+          element={
+            <ProtectedRoute>
+              <MyAgents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agents/add"
+          element={
+            <ProtectedRoute>
+              <AddAgents />
             </ProtectedRoute>
           }
         />

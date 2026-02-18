@@ -17,26 +17,28 @@ const VerifyOTP = () => {
   const [success, setSuccess] = useState(false);
   const [resendMessage, setResendMessage] = useState('');
 
+  const fromLogin = location.state?.fromLogin === true;
+
   useEffect(() => {
-    // Get email from location state (passed from signup) or localStorage
+    // Get email from location state (from signup, or from login when email not verified) or localStorage
     const emailFromState = location.state?.email;
     const emailFromStorage = localStorage.getItem('signupEmail');
-    
+
     if (emailFromState) {
-      setFormData(prev => ({ ...prev, email: emailFromState }));
-      localStorage.setItem('signupEmail', emailFromState);
+      const normalized = String(emailFromState).trim().toLowerCase();
+      setFormData(prev => ({ ...prev, email: normalized }));
+      if (!fromLogin) localStorage.setItem('signupEmail', normalized);
     } else if (emailFromStorage) {
       setFormData(prev => ({ ...prev, email: emailFromStorage }));
     } else {
-      // If no email found, redirect to signup
-      navigate('/');
+      if (fromLogin) navigate('/', { replace: true });
+      else navigate('/');
     }
 
-    // Auto-focus OTP input after a short delay
     setTimeout(() => {
       otpInputRef.current?.focus();
     }, 500);
-  }, [location, navigate]);
+  }, [location.state?.email, location.state?.fromLogin, fromLogin, navigate]);
 
   const handleChange = (e) => {
     setFormData({
@@ -156,9 +158,13 @@ const VerifyOTP = () => {
 
         {/* OTP Verification Form */}
         <div className="glass-red rounded-3xl shadow-2xl p-8 animate-in fade-in slide-in-from-right-4 border border-white/50 backdrop-blur-xl">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Enter OTP</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Verify your email</h2>
           <p className="text-gray-600 mb-6">
-            We've sent a verification code to <span className="font-semibold text-red-600">{formData.email}</span>
+            {fromLogin ? (
+              <>Verify your email to continue logging in. We've sent a 6-digit code to <span className="font-semibold text-red-600">{formData.email}</span></>
+            ) : (
+              <>We've sent a verification code to <span className="font-semibold text-red-600">{formData.email}</span></>
+            )}
           </p>
 
           {error && (

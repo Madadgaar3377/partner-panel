@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 import baseApi from '../constants/apiUrl';
 import { saveUserSession } from '../utils/auth';
 
 const Login = ({ onToggleForm }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -38,43 +40,32 @@ const Login = ({ onToggleForm }) => {
 
       if (data.success) {
         const user = data.user;
-        
-        // Check if email is verified first
-        if (!user.emailVerify) {
-          setError('Please verify your email address before logging in. Check your inbox for the verification link.');
-          return;
-        }
-        
-        // Save user session (20 days expiration)
         saveUserSession(data.token, user);
-        
-        // Check if user has completed their profile
-        // Profile is considered complete if RegisteredCompanyName exists (main required field)
-        const hasCompanyDetails = user.companyDetails && 
+        const hasCompanyDetails = user.companyDetails &&
                                   user.companyDetails.RegisteredCompanyName;
-        
-        // Routing logic based on verification states
+
         if (user.emailVerify && !user.isVerified) {
-          // Email verified but not admin verified
           if (!hasCompanyDetails) {
-            // Profile incomplete - redirect to complete profile
             window.location.href = '/complete-profile';
           } else {
-            // Profile complete but waiting for admin approval
             window.location.href = '/pending-verification';
           }
         } else if (user.emailVerify && user.isVerified) {
-          // Both email verified and admin verified
           if (!hasCompanyDetails) {
-            // Edge case: verified but profile incomplete - redirect to complete profile
             window.location.href = '/complete-profile';
           } else {
-            // Fully verified - redirect to dashboard
             window.location.href = '/dashboard';
           }
         } else {
-          // Should not reach here, but fallback
           setError('Account verification status unclear. Please contact support.');
+        }
+      } else if (data.code === 'EMAIL_NOT_VERIFIED') {
+        setError(data.message || 'Please verify your email before logging in.');
+        const email = (data.email || formData.email || '').trim().toLowerCase();
+        if (email) {
+          setTimeout(() => {
+            navigate('/verify-otp', { state: { email, fromLogin: true } });
+          }, 800);
         }
       } else {
         setError(data.message || 'Login failed. Please try again.');

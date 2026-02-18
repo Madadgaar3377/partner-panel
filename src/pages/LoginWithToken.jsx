@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { saveUserSession, clearUserSession } from '../utils/auth';
 import baseApi from '../constants/apiUrl';
 
+const PARTNER_API = (baseApi || '').replace(/\/$/, '');
+
 /**
  * Handles login via Bearer token in URL (redirect from main site when user is partner).
  * Calls GET /auth/partnerSession with Bearer token, saves session, then redirects.
@@ -14,10 +16,13 @@ export default function LoginWithToken() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (!token || !token.trim()) {
+    const query = window.location.search || (window.location.hash && window.location.hash.indexOf('?') >= 0 ? window.location.hash.slice(window.location.hash.indexOf('?')) : '');
+    const token = searchParams.get('token') || new URLSearchParams(query).get('token');
+    const trimmedToken = token && typeof token === 'string' ? token.trim() : '';
+
+    if (!trimmedToken) {
       setStatus('error');
-      setMessage('No token provided.');
+      setMessage('No token provided. Please log in from the main site or use the form below.');
       return;
     }
 
@@ -25,11 +30,11 @@ export default function LoginWithToken() {
 
     (async () => {
       try {
-        const res = await fetch(`${baseApi}/auth/partnerSession`, {
+        const res = await fetch(`${PARTNER_API}/auth/partnerSession`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token.trim()}`,
+            Authorization: `Bearer ${trimmedToken}`,
           },
         });
 
@@ -41,7 +46,7 @@ export default function LoginWithToken() {
           clearUserSession();
           setStatus('error');
           setMessage(data?.message || 'Invalid or expired token. Please log in again.');
-          setSearchParams({}); // Remove token from URL
+          setSearchParams({});
           return;
         }
 
@@ -53,10 +58,14 @@ export default function LoginWithToken() {
           return;
         }
 
-        saveUserSession(token.trim(), user);
+        saveUserSession(trimmedToken, user);
 
-        // Remove token from URL without full reload
+        // Remove token from URL
         setSearchParams({});
+        if (window.history && window.history.replaceState) {
+          const cleanUrl = window.location.pathname + window.location.hash.split('?')[0] || '';
+          window.history.replaceState({}, '', cleanUrl || '/');
+        }
         setStatus('success');
 
         const hasCompanyDetails = user.companyDetails && user.companyDetails.RegisteredCompanyName;
@@ -79,7 +88,8 @@ export default function LoginWithToken() {
     })();
 
     return () => { mounted = false; };
-  }, [searchParams, setSearchParams, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">

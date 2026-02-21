@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import SEO from './components/SEO';
 import Login from './pages/Login';
 import LoginWithToken from './pages/LoginWithToken';
 import { isAuthenticated, isSessionExpired, clearUserSession, getUserData } from './utils/auth';
@@ -45,6 +46,32 @@ import CommissionManagement from './pages/commission/CommissionManagement';
 // Partner's agents
 import MyAgents from './pages/agents/MyAgents';
 import AddAgents from './pages/agents/AddAgents';
+
+// Route-based SEO (title + meta per path)
+const getRouteSEO = (pathname) => {
+  const base = { noIndex: true };
+  if (pathname === '/' || pathname === '') return { ...base, title: 'Login', description: 'Sign in to Madadgaar Partner Portal. Manage installments, properties, loans, and insurance.', canonicalPath: '/' };
+  if (pathname === '/forget-password') return { ...base, title: 'Forgot Password', description: 'Reset your Madadgaar Partner account password.', canonicalPath: '/forget-password' };
+  if (pathname === '/reset-password') return { ...base, title: 'Reset Password', description: 'Set a new password for your Madadgaar Partner account.', canonicalPath: '/reset-password' };
+  if (pathname === '/verify-otp') return { ...base, title: 'Verify OTP', description: 'Verify your email with the one-time code.', canonicalPath: '/verify-otp' };
+  if (pathname === '/dashboard') return { ...base, title: 'Dashboard', description: 'Partner dashboard – overview, applications, and quick actions.', canonicalPath: '/dashboard' };
+  if (pathname === '/profile' || pathname === '/profile/edit') return { ...base, title: 'Profile', description: 'View and edit your partner profile.', canonicalPath: pathname };
+  if (pathname === '/complete-profile') return { ...base, title: 'Complete Profile', description: 'Complete your company and partner profile.', canonicalPath: '/complete-profile' };
+  if (pathname === '/pending-verification') return { ...base, title: 'Pending Verification', description: 'Your partner account is pending admin verification.', canonicalPath: '/pending-verification' };
+  if (pathname === '/installments' || pathname.startsWith('/installments')) return { ...base, title: 'Installments', description: 'Manage installment plans and applications.', canonicalPath: pathname };
+  if (pathname === '/property' || pathname.startsWith('/property')) return { ...base, title: 'Property', description: 'Manage property listings and applications.', canonicalPath: pathname };
+  if (pathname === '/loans' || pathname.startsWith('/loans')) return { ...base, title: 'Loans', description: 'Manage loan products and applications.', canonicalPath: pathname };
+  if (pathname === '/insurance' || pathname.startsWith('/insurance')) return { ...base, title: 'Insurance', description: 'Manage insurance plans and applications.', canonicalPath: pathname };
+  if (pathname.startsWith('/commission')) return { ...base, title: 'Commission', description: 'Commission configuration and management.', canonicalPath: pathname };
+  if (pathname === '/agents' || pathname.startsWith('/agents')) return { ...base, title: 'Agents', description: 'Manage linked agents and assignments.', canonicalPath: pathname };
+  return { ...base, title: 'Partner Portal', description: 'Madadgaar Partner Portal.', canonicalPath: pathname || '/' };
+};
+
+const RouteSEO = () => {
+  const location = useLocation();
+  const seo = useMemo(() => getRouteSEO(location.pathname), [location.pathname]);
+  return <SEO {...seo} />;
+};
 
 // Auth Page Component (handles login/signup toggle, or login-with-token from main site)
 const AuthPage = () => {
@@ -132,6 +159,7 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <Router>
+      <RouteSEO />
       <Routes>
         <Route path="/" element={<AuthPage />} />
         <Route path="/forget-password" element={<ForgetPassword />} />

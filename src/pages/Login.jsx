@@ -22,18 +22,29 @@ const Login = ({ onToggleForm }) => {
     setError('');
   };
 
+  const fetchClientIp = async () => {
+    try {
+      const r = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+      const d = await r.json();
+      return d?.ip || null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
+      const clientIp = await fetchClientIp();
       const response = await fetch(`${baseApi}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, loginSource: 'partner', ...(clientIp && { clientIp }) }),
       });
 
       const data = await response.json();

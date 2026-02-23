@@ -36,12 +36,21 @@ const PropertyList = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  // Backend deleteProperty expects 8-digit propertyId in URL (project.propertyId / individualProperty.propertyId)
+  const getPropertyIdForApi = (property) =>
+    property?.project?.propertyId || property?.individualProperty?.propertyId;
+
+  const handleDelete = async (property) => {
     if (!window.confirm('Are you sure you want to delete this property?')) return;
-    
+    const apiPropertyId = getPropertyIdForApi(property);
+    const mongoId = property._id;
+    if (!apiPropertyId) {
+      console.error('Property ID not found');
+      return;
+    }
     try {
       const token = localStorage.getItem('userToken');
-      const response = await fetch(`${apiUrl}/deleteProperty/${id}`, {
+      const response = await fetch(`${apiUrl}/deleteProperty/${apiPropertyId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -49,7 +58,9 @@ const PropertyList = () => {
       });
       const data = await response.json();
       if (data.success) {
-        setProperties(properties.filter(prop => prop._id !== id));
+        setProperties(properties.filter(prop => prop._id !== mongoId));
+      } else {
+        console.error('Delete failed:', data.message);
       }
     } catch (error) {
       console.error('Error deleting property:', error);
@@ -372,7 +383,7 @@ const PropertyList = () => {
                         <span className="text-xs font-semibold">Edit</span>
                       </button>
                       <button
-                        onClick={() => handleDelete(property._id)}
+                        onClick={() => handleDelete(property)}
                         className="flex items-center justify-center gap-1 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"
                       >
                         <Trash2 className="w-4 h-4" />

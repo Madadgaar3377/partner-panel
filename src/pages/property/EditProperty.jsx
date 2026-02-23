@@ -159,38 +159,26 @@ const EditProperty = () => {
         });
         const data = await response.json();
         
-        if (data.success && data.property) {
-          const prop = data.property;
-          
-          // Extract propertyId from contact info
-          let extractedPropertyId = null;
-          if (prop.project?.contact?.propertyId) {
-            extractedPropertyId = prop.project.contact.propertyId;
-          } else if (prop.individualProperty?.contact?.propertyId) {
-            extractedPropertyId = prop.individualProperty.contact.propertyId;
-          }
-          
+        const prop = data.success && (data.data || data.property);
+        if (prop) {
+          // propertyId is stored in project.propertyId or individualProperty.propertyId (not in contact)
+          const extractedPropertyId = prop.project?.propertyId || prop.individualProperty?.propertyId;
+
           if (extractedPropertyId) {
             setPropertyId(extractedPropertyId);
           } else {
             setError('Property ID not found. Cannot update property.');
           }
-          
-          console.log('Loaded property for editing:', {
-            mongoId: id,
-            propertyId: extractedPropertyId,
-            type: prop.type
-          });
-          
+
           setPropertyType(prop.type || 'Project');
-          
+
           if (prop.type === 'Project' && prop.project) {
             setProjectData(prop.project);
           } else if (prop.type === 'Individual' && prop.individualProperty) {
             setIndividualData(prop.individualProperty);
           }
         } else {
-          setError('Property not found');
+          setError(data.message || 'Property not found');
         }
       } catch (err) {
         console.error('Fetch error:', err);

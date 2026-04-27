@@ -58,6 +58,7 @@ const EditInstallmentPlan = () => {
       subCategory: "",
       specifications: []
     },
+    variants: [], // New: Product Variants
   });
 
   // Load userId from localStorage on component mount
@@ -128,7 +129,8 @@ const EditInstallmentPlan = () => {
               status: plan.status || "pending",
               productImages: plan.productImages || [],
               paymentPlans: plan.paymentPlans?.length > 0 ? plan.paymentPlans : [{ ...defaultPlan }],
-              productSpecifications: productSpecifications
+              productSpecifications: productSpecifications,
+              variants: plan.variants || [] // Load existing variants
             });
           } else {
             setError('Installment plan not found');
@@ -225,7 +227,12 @@ const EditInstallmentPlan = () => {
       const pp = [...f.paymentPlans];
       const p = { ...pp[index] };
 
-      const cashPrice = Number(f.price) || 0;
+      let cashPrice = Number(f.price) || 0;
+      // Use variant price if assigned
+      if (p.variantIndex !== undefined && p.variantIndex !== null && p.variantIndex !== -1 && f.variants?.[p.variantIndex]) {
+        cashPrice = Number(f.variants[p.variantIndex].price) || 0;
+      }
+
       const downPayment = Number(p.downPayment) || 0;
       const financedAmount = Math.max(0, cashPrice - downPayment);
       const months = parseInt(p.tenureMonths) || 0;
@@ -331,6 +338,26 @@ const EditInstallmentPlan = () => {
           category: form.category === "other" ? form.customCategory : form.category,
           price: Number(form.price),
           downpayment: Number(form.downpayment),
+          variants: form.variants.map((v, vIdx) => ({
+            ...v,
+            price: Number(v.price),
+            paymentPlans: form.paymentPlans
+              .filter(p => p.variantIndex === vIdx)
+              .map(p => ({
+                ...p,
+                installmentPrice: Number(p.installmentPrice),
+                downPayment: Number(p.downPayment),
+                monthlyInstallment: Number(p.monthlyInstallment)
+              }))
+          })),
+          paymentPlans: form.paymentPlans
+            .filter(p => p.variantIndex === null || p.variantIndex === undefined || p.variantIndex === -1)
+            .map(p => ({
+              ...p,
+              installmentPrice: Number(p.installmentPrice),
+              downPayment: Number(p.downPayment),
+              monthlyInstallment: Number(p.monthlyInstallment)
+            })),
         }),
       });
       const data = await res.json();
@@ -595,6 +622,68 @@ const EditInstallmentPlan = () => {
                   ))}
                 </div>
               )}
+
+              {/* Product Variants Section */}
+              {form.category && ['smartphones', 'tablets', 'laptops', 'gaming_consoles'].includes(form.category) && (
+                <div className="mt-8 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-gray-800">Product Variants</h3>
+                    <button 
+                      type="button"
+                      onClick={() => setForm(f => ({
+                        ...f,
+                        variants: [...f.variants, { 
+                          variantName: "", 
+                          price: f.price || 0, 
+                          paymentPlans: [],
+                          status: "active" 
+                        }]
+                      }))}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      + Add Variant
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    {form.variants.map((variant, vIdx) => (
+                      <div key={vIdx} className="p-6 bg-white border border-gray-200 rounded-xl relative shadow-sm">
+                        <button 
+                          type="button"
+                          onClick={() => setForm(f => ({
+                            ...f,
+                            variants: f.variants.filter((_, i) => i !== vIdx)
+                          }))}
+                          className="absolute top-4 right-4 text-gray-400 hover:text-red-600"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <InputField 
+                            label="Variant Name" 
+                            value={variant.variantName} 
+                            onChange={v => {
+                              const newVariants = [...form.variants];
+                              newVariants[vIdx].variantName = v;
+                              setForm(f => ({ ...f, variants: newVariants }));
+                            }}
+                            placeholder="e.g. 12/256GB"
+                          />
+                          <InputField 
+                            label="Cash Price (₨)" 
+                            type="number"
+                            value={variant.price} 
+                            onChange={v => {
+                              const newVariants = [...form.variants];
+                              newVariants[vIdx].price = v;
+                              setForm(f => ({ ...f, variants: newVariants }));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -800,6 +889,25 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) 
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="md:col-span-1 space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Applies To Variant</label>
+          <select 
+            value={plan.variantIndex ?? -1} 
+            onChange={e => {
+              const pp = [...form.paymentPlans];
+              pp[index].variantIndex = e.target.value === "-1" ? null : parseInt(e.target.value);
+              setForm(f => ({ ...f, paymentPlans: pp }));
+              setTimeout(() => recalcPlan(index), 0);
+            }}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white text-sm"
+          >
+            <option value="-1">All Variants / Base</option>
+            {form.variants.map((v, vIdx) => (
+              <option key={vIdx} value={vIdx}>{v.variantName} (₨ {v.price})</option>
+            ))}
+          </select>
+        </div>
+
         <InputField
           label="Plan Name"
           value={plan.planName}
@@ -880,7 +988,7 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) 
           <SummaryItem label="Total Markup" value={plan.markup} />
           <SummaryItem label="Total Payable" value={plan.installmentPrice} />
           <SummaryItem label="Customer Cost" value={plan.totalCostToCustomer} highlight />
-          <SummaryItem label="Financed Amount" value={financedAmount} />
+          <SummaryItem label="Financed Amount" value={Math.max(0, (plan.variantIndex !== null && plan.variantIndex !== undefined && form.variants[plan.variantIndex] ? parseFloat(form.variants[plan.variantIndex].price) : parseFloat(form.price) || 0) - (plan.downPayment || 0))} />
         </div>
       </div>
     </div>

@@ -45,6 +45,7 @@ const CreateInstallmentPlan = () => {
         productName: "",
         city: "",
         price: "",
+        partnerBasePrice: "",
         downpayment: "",
         installment: "",
         tenure: "",
@@ -110,6 +111,7 @@ const CreateInstallmentPlan = () => {
                 productName: "",
                 city: "",
                 price: "",
+                partnerBasePrice: "",
                 downpayment: "",
                 installment: "",
                 tenure: "",
@@ -131,6 +133,7 @@ const CreateInstallmentPlan = () => {
                 productName: product.productName || "",
                 city: product.city || "",
                 price: product.price || "",
+                partnerBasePrice: product.price || "",
                 downpayment: product.downpayment || "",
                 installment: product.installment || "",
                 tenure: product.tenure || "",
@@ -220,10 +223,18 @@ const CreateInstallmentPlan = () => {
             const pp = [...f.paymentPlans];
             const p = { ...pp[index] };
 
-            let cashPrice = Number(p.cashPrice) || Number(f.price) || 0;
-            // Use variant price if assigned
-            if (p.variantIndex !== undefined && p.variantIndex !== null && p.variantIndex !== -1 && f.variants?.[p.variantIndex]) {
-                cashPrice = Number(p.cashPrice) || Number(f.variants[p.variantIndex].price) || 0;
+            // Cash price precedence:
+            // 1) Plan cashPrice override (partner-defined)
+            // 2) Variant price (if plan applies to variant)
+            // 3) Partner base price override (when attaching to existing product)
+            // 4) Global product price
+            let cashPrice = Number(p.cashPrice) || 0;
+            if (!cashPrice) {
+                if (p.variantIndex !== undefined && p.variantIndex !== null && p.variantIndex !== -1 && f.variants?.[p.variantIndex]) {
+                    cashPrice = Number(f.variants[p.variantIndex].price) || 0;
+                } else {
+                    cashPrice = Number(f.partnerBasePrice) || Number(f.price) || 0;
+                }
             }
 
             const downPayment = Number(p.downPayment) || 0;
@@ -334,6 +345,7 @@ const CreateInstallmentPlan = () => {
                         ...plan,
                         variantIndex: variantIdx,
                         cashPrice: Number(plan.cashPrice) || 0,
+                        partnerBasePrice: Number(form.partnerBasePrice) || 0,
                         installmentPrice: Number(plan.installmentPrice),
                         downPayment: Number(plan.downPayment),
                         monthlyInstallment: Number(plan.monthlyInstallment),
@@ -551,6 +563,15 @@ const CreateInstallmentPlan = () => {
                                     onChange={v => updateForm('price', v)}
                                     placeholder="0"
                                     readOnly={!!selectedProductId}
+                                />
+
+                                <InputField
+                                    label="Partner Base Price (PKR)"
+                                    type="number"
+                                    value={form.partnerBasePrice}
+                                    onChange={v => updateForm('partnerBasePrice', v)}
+                                    placeholder="Optional override for your listing"
+                                    readOnly={!selectedProductId}
                                 />
 
                                 <div className="space-y-2">

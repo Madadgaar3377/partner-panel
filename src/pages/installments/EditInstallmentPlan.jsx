@@ -627,7 +627,7 @@ const EditInstallmentPlan = () => {
               )}
 
               {/* Product Variants Section */}
-              {form.category && ['smartphones', 'tablets', 'laptops', 'gaming_consoles'].includes(form.category) && (
+              {form.category && (
                 <div className="mt-8 space-y-6">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xl font-bold text-gray-800">Product Variants</h3>
@@ -637,7 +637,8 @@ const EditInstallmentPlan = () => {
                         ...f,
                         variants: [...f.variants, { 
                           variantName: "", 
-                          price: f.price || 0, 
+                          price: f.price || 0,
+                          discountPercent: 0,
                           paymentPlans: [],
                           status: "active" 
                         }]
@@ -660,7 +661,7 @@ const EditInstallmentPlan = () => {
                         >
                           <X className="w-5 h-5" />
                         </button>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <InputField 
                             label="Variant Name" 
                             value={variant.variantName} 
@@ -680,6 +681,17 @@ const EditInstallmentPlan = () => {
                               newVariants[vIdx].price = v;
                               setForm(f => ({ ...f, variants: newVariants }));
                             }}
+                          />
+                          <InputField 
+                            label="Discount (%)" 
+                            type="number"
+                            value={variant.discountPercent ?? ""} 
+                            onChange={v => {
+                              const newVariants = [...form.variants];
+                              newVariants[vIdx].discountPercent = v;
+                              setForm(f => ({ ...f, variants: newVariants }));
+                            }}
+                            placeholder="0"
                           />
                         </div>
                       </div>

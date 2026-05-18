@@ -13,9 +13,70 @@ import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 
+const getVariantEffectivePrice = (variant) => {
+    if (!variant) return 0;
+    const base = Number(variant.price) || 0;
+    const disc = Math.min(100, Math.max(0, Number(variant.discountPercent) || 0));
+    return Math.round(base * (1 - disc / 100));
+};
+
+const deriveProductPrice = (variants, fallback = 0) => {
+    if (variants?.length) {
+        const prices = variants.map(getVariantEffectivePrice).filter((p) => p > 0);
+        if (prices.length) return Math.min(...prices);
+    }
+    return Number(fallback) || 0;
+};
+
+const collectPartnerPlans = (product, partnerId) => {
+    if (!product || !partnerId) return [];
+    const match = (p) => p?.partnerId && String(p.partnerId) === String(partnerId);
+    const root = (product.paymentPlans || []).filter(match);
+    const fromVariants = (product.variants || []).flatMap((v) => (v.paymentPlans || []).filter(match));
+    return [...root, ...fromVariants];
+};
+
+const mapProductVariantsForPartner = (product, partnerId) => {
+    const partnerEntry = (product?.partnerPricing || []).find(
+        (p) => p?.partnerId && String(p.partnerId) === String(partnerId)
+    );
+    const overrides = partnerEntry?.variantOverrides || [];
+    return (product?.variants || []).map((v, i) => {
+        const ov = overrides.find((o) => Number(o.variantIndex) === i);
+        return {
+            variantName: v.variantName || `Variant ${i + 1}`,
+            listingPrice: v.price,
+            price: ov?.cashPrice ?? "",
+            discountPercent: ov?.discountPercent ?? 0,
+            isCatalogVariant: true,
+            sourceVariantIndex: i,
+            status: v.status || "active",
+        };
+    });
+};
+
+const resolvePlanVariantIndex = (plan, variants) => {
+    const vIdx = plan.variantIndex;
+    if (vIdx === null || vIdx === undefined || vIdx === "" || vIdx === -1 || vIdx === "-1") return null;
+    const variant = variants?.[Number(vIdx)];
+    if (variant?.isCatalogVariant && variant.sourceVariantIndex != null) {
+        return Number(variant.sourceVariantIndex);
+    }
+    return Number(vIdx);
+};
+
+const buildPartnerVariantPricing = (variants) =>
+    (variants || [])
+        .filter((v) => v.isCatalogVariant && Number.isFinite(Number(v.sourceVariantIndex)))
+        .map((v) => ({
+            variantIndex: Number(v.sourceVariantIndex),
+            cashPrice: Number(v.price) || 0,
+            discountPercent: Number(v.discountPercent) || 0,
+        }))
+        .filter((v) => v.cashPrice > 0);
+
 const defaultPlan = {
     planName: "",
-    cashPrice: 0,
     installmentPrice: 0,
     downPayment: 0,
     monthlyInstallment: 0,
@@ -120,20 +181,22 @@ const CreateInstallmentPlan = () => {
                 category: "",
                 productImages: [],
                 paymentPlans: [{ ...defaultPlan }],
-                productSpecifications: { category: "", subCategory: "", specifications: [] }
+                productSpecifications: { category: "", subCategory: "", specifications: [] },
+                variants: [],
             }));
             return;
         }
 
         const product = existingProducts.find(p => p.installmentPlanId === productId || p._id === productId);
         if (product) {
-            setExistingPlans(product.paymentPlans || []);
-            setForm(prev => ({
+            setForm(prev => {
+            setExistingPlans(collectPartnerPlans(product, prev.userId));
+            return {
                 ...prev,
                 productName: product.productName || "",
                 city: product.city || "",
                 price: product.price || "",
-                partnerBasePrice: product.price || "",
+                partnerBasePrice: "",
                 downpayment: product.downpayment || "",
                 installment: product.installment || "",
                 tenure: product.tenure || "",
@@ -143,8 +206,9 @@ const CreateInstallmentPlan = () => {
                 productImages: product.productImages || [],
                 paymentPlans: [{ ...defaultPlan }],
                 productSpecifications: product.productSpecifications || { category: "", subCategory: "", specifications: [] },
-                variants: product.variants || [] // Load existing variants
-            }));
+                variants: mapProductVariantsForPartner(product, prev.userId),
+            };
+            });
         }
     };
 
@@ -223,18 +287,11 @@ const CreateInstallmentPlan = () => {
             const pp = [...f.paymentPlans];
             const p = { ...pp[index] };
 
-            // Cash price precedence:
-            // 1) Plan cashPrice override (partner-defined)
-            // 2) Variant price (if plan applies to variant)
-            // 3) Partner base price override (when attaching to existing product)
-            // 4) Global product price
-            let cashPrice = Number(p.cashPrice) || 0;
-            if (!cashPrice) {
-                if (p.variantIndex !== undefined && p.variantIndex !== null && p.variantIndex !== -1 && f.variants?.[p.variantIndex]) {
-                    cashPrice = Number(f.variants[p.variantIndex].price) || 0;
-                } else {
-                    cashPrice = Number(f.partnerBasePrice) || Number(f.price) || 0;
-                }
+            let cashPrice = 0;
+            if (p.variantIndex !== undefined && p.variantIndex !== null && p.variantIndex !== -1 && f.variants?.[p.variantIndex]) {
+                cashPrice = getVariantEffectivePrice(f.variants[p.variantIndex]);
+            } else {
+                cashPrice = deriveProductPrice(f.variants, f.price);
             }
 
             const downPayment = Number(p.downPayment) || 0;
@@ -287,7 +344,7 @@ const CreateInstallmentPlan = () => {
             form.paymentPlans.forEach((_, idx) => recalcPlan(idx));
         }
         // eslint-disable-next-line
-    }, [form.price]);
+    }, [form.price, form.variants]);
 
     // --- Image Handling ---
     const handleFilesChange = (e) => {
@@ -336,16 +393,18 @@ const CreateInstallmentPlan = () => {
             const token = localStorage.getItem('userToken');
 
             if (selectedProductId) {
+                const partnerBasePrice = deriveProductPrice(form.variants, form.price);
+                const partnerVariantPricing = buildPartnerVariantPricing(form.variants);
+
                 for (const plan of form.paymentPlans) {
-                    const variantIdx =
-                        plan.variantIndex === null || plan.variantIndex === undefined || plan.variantIndex === "" || plan.variantIndex === -1 || plan.variantIndex === "-1"
-                            ? null
-                            : Number(plan.variantIndex);
+                    const variantIdx = resolvePlanVariantIndex(plan, form.variants);
                     const planData = {
                         ...plan,
                         variantIndex: variantIdx,
-                        cashPrice: Number(plan.cashPrice) || 0,
-                        partnerBasePrice: Number(form.partnerBasePrice) || 0,
+                        cashPrice: cashPriceForPlan(plan),
+                        partnerBasePrice,
+                        partnerVariantPricing,
+                        userId: form.userId,
                         installmentPrice: Number(plan.installmentPrice),
                         downPayment: Number(plan.downPayment),
                         monthlyInstallment: Number(plan.monthlyInstallment),
@@ -355,11 +414,7 @@ const CreateInstallmentPlan = () => {
                         partnerId: form.userId,
                         companyName: "Partner"
                     };
-                    
-                    // If plan is for a specific variant, we need to handle that.
-                    // The backend /add-plan endpoint might need updating or we handle it here.
-                    // For now, we'll send it and ensure the backend knows how to store it.
-                    
+
                     const res = await fetch(`${baseApi}/installment/${selectedProductId}/add-plan`, {
                         method: "POST",
                         headers: {
@@ -379,6 +434,8 @@ const CreateInstallmentPlan = () => {
                 return;
             }
 
+            const productPrice = deriveProductPrice(form.variants, form.price);
+
             const res = await fetch(`${baseApi}/createInstallmentPlan`, {
                 method: "POST",
                 headers: {
@@ -388,17 +445,19 @@ const CreateInstallmentPlan = () => {
                 body: JSON.stringify({
                     ...form,
                     category: form.category === "other" ? form.customCategory : form.category,
-                    price: Number(form.price),
+                    price: productPrice,
                     downpayment: Number(form.downpayment),
                     postedBy: "Partner",
                     variants: form.variants.map((v, vIdx) => ({
-                        ...v,
+                        variantName: v.variantName,
                         price: Number(v.price),
+                        discountPercent: Number(v.discountPercent) || 0,
+                        status: v.status || "active",
                         paymentPlans: form.paymentPlans
                             .filter(p => p.variantIndex === vIdx)
                             .map(p => ({
                                 ...p,
-                                cashPrice: Number(p.cashPrice) || 0,
+                                cashPrice: getVariantEffectivePrice(v),
                                 installmentPrice: Number(p.installmentPrice),
                                 downPayment: Number(p.downPayment),
                                 monthlyInstallment: Number(p.monthlyInstallment)
@@ -408,7 +467,7 @@ const CreateInstallmentPlan = () => {
                         .filter(p => p.variantIndex === null || p.variantIndex === undefined || p.variantIndex === -1)
                         .map(p => ({
                             ...p,
-                            cashPrice: Number(p.cashPrice) || 0,
+                            cashPrice: productPrice,
                             installmentPrice: Number(p.installmentPrice),
                             downPayment: Number(p.downPayment),
                             monthlyInstallment: Number(p.monthlyInstallment)
@@ -429,10 +488,41 @@ const CreateInstallmentPlan = () => {
         }
     };
 
+    const showVariantSection = Boolean(form.category);
+
+    const cashPriceForPlan = (plan) => {
+        const vIdx = plan.variantIndex;
+        if (vIdx !== undefined && vIdx !== null && vIdx !== -1 && form.variants?.[vIdx]) {
+            return getVariantEffectivePrice(form.variants[vIdx]);
+        }
+        return deriveProductPrice(form.variants, form.price);
+    };
+
     const isStepValid = () => {
-        if (step === 1) return form.productName && form.city && form.price && form.category;
+        if (step === 1) return form.productName && form.city && form.category;
         if (step === 3 && !selectedProductId) return form.productImages.length > 0;
-        if (step === 4) return form.paymentPlans.length > 0;
+        if (step === 4) {
+            if (!form.paymentPlans.length) return false;
+            if (showVariantSection && !selectedProductId) {
+                if (form.variants.length === 0) return false;
+                if (form.variants.some((v) => !v.variantName || !Number(v.price))) return false;
+            }
+            if (showVariantSection && selectedProductId) {
+                const planVariantIdxs = form.paymentPlans
+                    .map((p) => p.variantIndex)
+                    .filter((ix) => ix !== null && ix !== undefined && ix !== -1 && ix !== "");
+                if (form.variants.length > 0 && planVariantIdxs.length > 0) {
+                    if (!planVariantIdxs.every((ix) => Number(form.variants[Number(ix)]?.price) > 0)) return false;
+                } else if (form.variants.length > 0) {
+                    if (!form.variants.some((v) => Number(v.price) > 0)) return false;
+                } else if (!Number(form.price)) {
+                    return false;
+                }
+            }
+            if (!showVariantSection && !selectedProductId && !Number(form.price)) return false;
+            if (!showVariantSection && selectedProductId && !Number(form.price)) return false;
+            return true;
+        }
         return true;
     };
 
@@ -554,24 +644,6 @@ const CreateInstallmentPlan = () => {
                                     onChange={v => updateForm('city', v)}
                                     placeholder="e.g., Lahore"
                                     readOnly={!!selectedProductId}
-                                />
-
-                                <InputField
-                                    label="Base Price (PKR) *"
-                                    type="number"
-                                    value={form.price}
-                                    onChange={v => updateForm('price', v)}
-                                    placeholder="0"
-                                    readOnly={!!selectedProductId}
-                                />
-
-                                <InputField
-                                    label="Partner Base Price (PKR)"
-                                    type="number"
-                                    value={form.partnerBasePrice}
-                                    onChange={v => updateForm('partnerBasePrice', v)}
-                                    placeholder="Optional override for your listing"
-                                    readOnly={!selectedProductId}
                                 />
 
                                 <div className="space-y-2">
@@ -704,7 +776,7 @@ const CreateInstallmentPlan = () => {
                             )}
 
                             {/* Product Variants Section */}
-                            {!selectedProductId && form.category && ['smartphones', 'tablets', 'laptops', 'gaming_consoles'].includes(form.category) && (
+                            {false && form.category && ['smartphones', 'tablets', 'laptops', 'gaming_consoles'].includes(form.category) && (
                                 <div className="mt-8 space-y-6">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-xl font-bold text-gray-800">Product Variants</h3>
@@ -855,13 +927,13 @@ const CreateInstallmentPlan = () => {
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-red-600 pl-4">
-                                    Payment Plans
+                                    Variants & Payment Plans
                                 </h2>
                                 <div className="flex items-center gap-4">
                                     <div className="text-right">
-                                        <p className="text-xs text-gray-500">Product Price</p>
+                                        <p className="text-xs text-gray-500">Reference cash price</p>
                                         <p className="text-xl font-bold text-red-600">
-                                            ₨ {Number(form.price || 0).toLocaleString()}
+                                            ₨ {deriveProductPrice(form.variants, form.price).toLocaleString()}
                                         </p>
                                     </div>
                                     <button
@@ -873,6 +945,67 @@ const CreateInstallmentPlan = () => {
                                     </button>
                                 </div>
                             </div>
+
+                            {showVariantSection && (
+                                <div className="space-y-4 p-6 bg-blue-50 border border-blue-200 rounded-xl">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            {!selectedProductId && (
+                                                <>
+                                                    <h3 className="text-lg font-bold text-gray-800">Create Product Variants</h3>
+                                                    <p className="text-sm text-gray-600 mt-1">Add variant options with cash price and optional discount (% off cash price).</p>
+                                                </>
+                                            )}
+                                        </div>
+                                        {!selectedProductId && (
+                                        <button type="button" onClick={() => setForm(f => ({ ...f, variants: [...f.variants, { variantName: "", price: "", discountPercent: 0, paymentPlans: [], status: "active" }] }))} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">+ Add Variant</button>
+                                        )}
+                                    </div>
+                                    {form.variants.length === 0 ? (
+                                        <p className="text-sm text-gray-500 py-4 text-center">{selectedProductId ? "This product has no variants. Use your cash price below." : "Add at least one variant before creating payment plans."}</p>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {form.variants.map((variant, vIdx) => (
+                                                <div key={vIdx} className="p-4 bg-white border border-gray-200 rounded-xl relative">
+                                                    {!selectedProductId && (
+                                                    <button type="button" onClick={() => setForm(f => ({ ...f, variants: f.variants.filter((_, i) => i !== vIdx) }))} className="absolute top-3 right-3 text-gray-400 hover:text-red-600"><X className="w-5 h-5" /></button>
+                                                    )}
+                                                    {selectedProductId ? (
+                                                        <div className="space-y-4">
+                                                            <div className="space-y-1">
+                                                                <span className="text-xs font-medium text-gray-500">Product variant (from listing — not editable)</span>
+                                                                <p className="text-base font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 cursor-default">{variant.variantName || `Variant ${vIdx + 1}`}</p>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                <InputField label="Your Cash Price (₨) *" type="number" value={variant.price} onChange={v => { const nv = [...form.variants]; nv[vIdx].price = v; setForm(f => ({ ...f, variants: nv })); }} />
+                                                                <InputField label="Your Discount (%)" type="number" value={variant.discountPercent ?? ""} onChange={v => { const nv = [...form.variants]; nv[vIdx].discountPercent = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="0" />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4 pr-8">
+                                                        <InputField label="Variant Name *" value={variant.variantName} onChange={v => { const nv = [...form.variants]; nv[vIdx].variantName = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="e.g. 12GB / 256GB" />
+                                                        <InputField label="Cash Price (₨) *" type="number" value={variant.price} onChange={v => { const nv = [...form.variants]; nv[vIdx].price = v; setForm(f => ({ ...f, variants: nv })); }} />
+                                                        <InputField label="Discount (%)" type="number" value={variant.discountPercent ?? ""} onChange={v => { const nv = [...form.variants]; nv[vIdx].discountPercent = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="0" />
+                                                        <div className="flex flex-col justify-end">
+                                                            <span className="text-xs text-gray-500">Effective cash price</span>
+                                                            <span className="text-lg font-bold text-red-600">₨ {getVariantEffectivePrice(variant).toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {!showVariantSection && (
+                                <InputField label={selectedProductId ? "Your Cash Price (₨)" : "Cash Price (₨) *"} type="number" value={form.price} onChange={v => updateForm('price', v)} placeholder="Cash price for installment calculations" />
+                            )}
+
+                            {selectedProductId && existingPlans.length === 0 && (
+                                <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">No payment plans from your company on this product yet. Other vendors&apos; plans are hidden.</p>
+                            )}
 
                             <div className="space-y-6">
                                 {/* Render Existing Plans (Read-Only) */}
@@ -914,6 +1047,7 @@ const CreateInstallmentPlan = () => {
                                         setForm={setForm}
                                         recalcPlan={recalcPlan}
                                         canRemove={form.paymentPlans.length > 1}
+                                        selectedProductId={selectedProductId}
                                     />
                                 ))}
                             </div>
@@ -981,7 +1115,7 @@ const InputField = ({ label, value, onChange, type = "text", placeholder = "", r
 );
 
 // Payment Plan Card Component
-const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) => {
+const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove, selectedProductId }) => {
     const updatePlan = (field, value) => {
         const pp = [...form.paymentPlans];
         pp[index][field] = value;
@@ -1002,6 +1136,7 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) 
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                {form.variants.length > 0 && (
                 <div className="md:col-span-1 space-y-2">
                     <label className="block text-sm font-medium text-gray-700">Applies To Variant</label>
                     <select 
@@ -1014,26 +1149,19 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) 
                         }}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white text-sm"
                     >
-                        <option value="-1">All Variants / Base</option>
+                        <option value="-1">{selectedProductId && form.variants.length > 0 ? "— Select variant —" : "Standard (no variant)"}</option>
                         {form.variants.map((v, vIdx) => (
-                            <option key={vIdx} value={vIdx}>{v.variantName} (₨ {v.price})</option>
+                            <option key={vIdx} value={vIdx}>{v.variantName} (₨ {getVariantEffectivePrice(v).toLocaleString()})</option>
                         ))}
                     </select>
                 </div>
+                )}
 
                 <InputField
                     label="Plan Name"
                     value={plan.planName}
                     onChange={v => updatePlan('planName', v)}
                     placeholder="e.g., 12-Month Plan"
-                />
-
-                <InputField
-                    label="Partner Cash Price (₨)"
-                    type="number"
-                    value={plan.cashPrice}
-                    onChange={v => updatePlan('cashPrice', v)}
-                    placeholder="0"
                 />
 
                 <div className="space-y-2">
@@ -1109,7 +1237,7 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) 
                     <SummaryItem label="Total Markup" value={plan.markup} />
                     <SummaryItem label="Total Payable" value={plan.installmentPrice} />
                     <SummaryItem label="Customer Cost" value={plan.totalCostToCustomer} highlight />
-                    <SummaryItem label="Financed Amount" value={Math.max(0, (Number(plan.cashPrice) || (plan.variantIndex !== null && plan.variantIndex !== undefined && form.variants[plan.variantIndex] ? parseFloat(form.variants[plan.variantIndex].price) : parseFloat(form.price) || 0)) - (plan.downPayment || 0))} />
+                    <SummaryItem label="Financed Amount" value={Math.max(0, (plan.variantIndex !== null && plan.variantIndex !== undefined && form.variants[plan.variantIndex] ? getVariantEffectivePrice(form.variants[plan.variantIndex]) : deriveProductPrice(form.variants, form.price)) - (plan.downPayment || 0))} />
                 </div>
             </div>
         </div>

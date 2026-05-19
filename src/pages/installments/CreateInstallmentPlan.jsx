@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
+import SearchableProductSelect from '../../components/SearchableProductSelect';
 
 const getVariantEffectivePrice = (variant) => {
     if (!variant) return 0;
@@ -187,7 +188,9 @@ const CreateInstallmentPlan = () => {
             return;
         }
 
-        const product = existingProducts.find(p => p.installmentPlanId === productId || p._id === productId);
+        const product = existingProducts.find(
+            (p) => (p.installmentPlanId || p._id) === productId
+        );
         if (product) {
             setForm(prev => {
             setExistingPlans(collectPartnerPlans(product, prev.userId));
@@ -605,19 +608,14 @@ const CreateInstallmentPlan = () => {
                                 <h3 className="text-lg font-bold text-blue-800 mb-2">Multi-Vendor: Attach to Existing Product</h3>
                                 <p className="text-sm text-blue-600 mb-4">Select an existing product to attach your own payment plans. This will lock the product details.</p>
                                 <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-gray-700">Select Product (Optional)</label>
-                                    <select
+                                    <label className="block text-sm font-medium text-gray-700">Find existing product (optional)</label>
+                                    <SearchableProductSelect
+                                        products={existingProducts}
                                         value={selectedProductId}
-                                        onChange={(e) => handleSelectExistingProduct(e.target.value)}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                                    >
-                                        <option value="">-- Create New Product From Scratch --</option>
-                                        {existingProducts.map(p => (
-                                            <option key={p.installmentPlanId || p._id} value={p.installmentPlanId || p._id}>
-                                                {p.productName} - PKR {p.price}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={handleSelectExistingProduct}
+                                        placeholder="Type to search — e.g. Samsung, Lahore..."
+                                        createNewLabel="-- Create new product from scratch --"
+                                    />
                                 </div>
                             </div>
                             

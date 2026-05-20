@@ -20,6 +20,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { PRODUCT_CATEGORIES } from '../../constants/productCategories';
+import { filterPlansForEditor } from '../../utils/installmentPartnerPlans';
 
 const InstallmentDetail = () => {
   const navigate = useNavigate();
@@ -38,7 +39,9 @@ const InstallmentDetail = () => {
         return;
       }
 
-      const response = await fetch(`${baseApi}/getAllCreateInstallnment`, {
+      const partnerUserId = JSON.parse(localStorage.getItem('userData') || '{}')?.userId;
+
+      const response = await fetch(`${baseApi}/getInstallment/${encodeURIComponent(id)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -49,9 +52,19 @@ const InstallmentDetail = () => {
       const data = await response.json();
 
       if (data.success) {
-        const found = data.data.find(item => item._id === id);
+        const found = data.data;
         if (found) {
-          setInstallment(found);
+          const ownerId = found.userId || "";
+          const myRootPlans = filterPlansForEditor(found.paymentPlans, partnerUserId, ownerId);
+          const myVariants = (found.variants || []).map((v) => ({
+            ...v,
+            paymentPlans: filterPlansForEditor(v.paymentPlans, partnerUserId, ownerId),
+          }));
+          setInstallment({
+            ...found,
+            paymentPlans: myRootPlans,
+            variants: myVariants,
+          });
         } else {
           setError('Installment plan not found');
         }
@@ -254,8 +267,9 @@ const InstallmentDetail = () => {
               <div className="glass-red rounded-xl shadow-lg p-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                   <Package className="w-6 h-6 text-blue-600" />
-                  Payment Plans
+                  Your Payment Plans
                 </h2>
+                <p className="text-sm text-gray-500 mb-4 -mt-4">Only plans from your company are shown here.</p>
                 <div className="space-y-4">
                   {installment.paymentPlans.map((plan, index) => (
                     <div 

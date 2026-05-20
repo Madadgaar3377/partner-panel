@@ -12,6 +12,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
+import {
+  filterPlansForEditor,
+  mapVariantsForEditor,
+  isAttachedMultiVendor,
+  buildInstallmentUpdateBody,
+} from '../../utils/installmentPartnerPlans';
 
 const defaultPlan = {
   planName: "",
@@ -36,6 +42,8 @@ const EditInstallmentPlan = () => {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [localImages, setLocalImages] = useState([]);
+  const [productOwnerUserId, setProductOwnerUserId] = useState("");
+  const [isAttachedProduct, setIsAttachedProduct] = useState(false);
 
   const [form, setForm] = useState({
     userId: "",
@@ -83,19 +91,27 @@ const EditInstallmentPlan = () => {
       try {
         setFetchLoading(true);
         const token = localStorage.getItem('userToken');
-        const response = await fetch(`${baseApi}/getAllCreateInstallnment`, {
+        const partnerUserId = JSON.parse(localStorage.getItem('userData') || '{}')?.userId;
+
+        const response = await fetch(`${baseApi}/getInstallment/${encodeURIComponent(id)}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           }
         });
 
         const data = await response.json();
         
         if (data.success) {
-          const plan = data.data.find(p => p._id === id || p.installmentPlanId === id);
+          const plan = data.data;
           if (plan) {
+            const ownerId = plan.userId || "";
+            setProductOwnerUserId(ownerId);
+            setIsAttachedProduct(isAttachedMultiVendor(partnerUserId, ownerId));
+
+            const myPlans = filterPlansForEditor(plan.paymentPlans, partnerUserId, ownerId);
+            const myVariants = mapVariantsForEditor(plan.variants, partnerUserId, ownerId);
             // Initialize specifications based on category
             let productSpecifications = {
               category: plan.category || "",
@@ -117,6 +133,7 @@ const EditInstallmentPlan = () => {
 
             setForm({
               ...form,
+              userId: partnerUserId || form.userId,
               productName: plan.productName || "",
               city: plan.city || "",
               price: plan.price || "",
@@ -129,9 +146,9 @@ const EditInstallmentPlan = () => {
               customCategory: plan.customCategory || "",
               status: plan.status || "pending",
               productImages: plan.productImages || [],
-              paymentPlans: plan.paymentPlans?.length > 0 ? plan.paymentPlans : [{ ...defaultPlan }],
+              paymentPlans: myPlans.length > 0 ? myPlans : [{ ...defaultPlan }],
               productSpecifications: productSpecifications,
-              variants: plan.variants || [] // Load existing variants
+              variants: myVariants,
             });
           } else {
             setError('Installment plan not found');
@@ -328,40 +345,22 @@ const EditInstallmentPlan = () => {
     setError(null);
     try {
       const token = localStorage.getItem('userToken');
+      const partnerUserId = form.userId || JSON.parse(localStorage.getItem('userData') || '{}')?.userId;
+
+      const productPatch = buildInstallmentUpdateBody({
+        form,
+        editorUserId: partnerUserId,
+        isAttachedProduct,
+        includeFullForm: !isAttachedProduct,
+      });
+
       const res = await fetch(`${baseApi}/updateInstallment/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          ...form,
-          category: form.category === "other" ? form.customCategory : form.category,
-          price: Number(form.price),
-          downpayment: Number(form.downpayment),
-          variants: form.variants.map((v, vIdx) => ({
-            ...v,
-            price: Number(v.price),
-            paymentPlans: form.paymentPlans
-              .filter(p => p.variantIndex === vIdx)
-              .map(p => ({
-                ...p,
-                cashPrice: Number(p.cashPrice) || 0,
-                installmentPrice: Number(p.installmentPrice),
-                downPayment: Number(p.downPayment),
-                monthlyInstallment: Number(p.monthlyInstallment)
-              }))
-          })),
-          paymentPlans: form.paymentPlans
-            .filter(p => p.variantIndex === null || p.variantIndex === undefined || p.variantIndex === -1)
-            .map(p => ({
-              ...p,
-              cashPrice: Number(p.cashPrice) || 0,
-              installmentPrice: Number(p.installmentPrice),
-              downPayment: Number(p.downPayment),
-              monthlyInstallment: Number(p.monthlyInstallment)
-            })),
-        }),
+        body: JSON.stringify(productPatch),
       });
       const data = await res.json();
       if (data.success) {
@@ -414,6 +413,11 @@ const EditInstallmentPlan = () => {
           </button>
           <h1 className="text-3xl font-bold text-gray-800">Edit Installment Plan</h1>
           <p className="text-gray-600 mt-1">Update your installment plan details</p>
+          {isAttachedProduct && (
+            <p className="mt-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+              Shared catalog product: edit <strong>only your company&apos;s payment plans</strong>. Other vendors&apos; plans stay on the listing unchanged.
+            </p>
+          )}
         </div>
 
         {/* Progress Steps */}

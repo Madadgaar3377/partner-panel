@@ -115,10 +115,7 @@ export const flattenEditorPaymentPlans = (product, editorUserId, productOwnerUse
   const fromVariants = (product?.variants || []).flatMap((v, vIdx) =>
     filterPlansForEditor(v.paymentPlans, editorUserId, productOwnerUserId).map((p) => ({
       ...p,
-      variantIndex:
-        p.variantIndex !== null && p.variantIndex !== undefined && p.variantIndex !== ""
-          ? Number(p.variantIndex)
-          : vIdx,
+      variantIndex: vIdx,
     }))
   );
 
@@ -358,9 +355,17 @@ export const buildInstallmentUpdateBody = ({
     return attachPartnerMetaToPlan(mapped, profile, editorUserId, isNew);
   };
 
+  const variantIndexMatchesEditor = (plan, vIdx) => {
+    const raw = plan.variantIndex;
+    if (raw === null || raw === undefined || raw === "" || raw === -1 || raw === "-1") {
+      return false;
+    }
+    return Number(raw) === vIdx;
+  };
+
   const variantsPayload = (form.variants || []).map((v, vIdx) => {
     const variantPlans = plansSource
-      .filter((p) => Number(p.variantIndex) === vIdx)
+      .filter((p) => variantIndexMatchesEditor(p, vIdx))
       .map((p) => withPartnerId(p, getVariantEffectivePrice(v)));
 
     if (isAttachedProduct) {
@@ -380,13 +385,16 @@ export const buildInstallmentUpdateBody = ({
   });
 
   const rootPlans = plansSource
-    .filter(
-      (p) =>
-        p.variantIndex === null ||
-        p.variantIndex === undefined ||
-        p.variantIndex === -1 ||
-        p.variantIndex === ""
-    )
+    .filter((p) => {
+      const raw = p.variantIndex;
+      return (
+        raw === null ||
+        raw === undefined ||
+        raw === -1 ||
+        raw === "-1" ||
+        raw === ""
+      );
+    })
     .map((p) => withPartnerId(p, productPrice));
 
   if (isAttachedProduct) {

@@ -17,7 +17,7 @@ import {
   getVariantEffectivePrice,
   deriveProductPrice,
   mapInstallmentPlanToForm,
-  buildInstallmentUpdateBody,
+  submitInstallmentPlanUpdate,
 } from '../../utils/installmentPartnerPlans';
 
 const defaultPlan = DEFAULT_INSTALLMENT_PLAN;
@@ -32,7 +32,6 @@ const EditInstallmentPlan = () => {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [localImages, setLocalImages] = useState([]);
-  const [productOwnerUserId, setProductOwnerUserId] = useState("");
   const [isAttachedProduct, setIsAttachedProduct] = useState(false);
 
   const [form, setForm] = useState({
@@ -102,7 +101,6 @@ const EditInstallmentPlan = () => {
           if (plan) {
             const mapped = mapInstallmentPlanToForm(plan, partnerUserId);
             const { _meta, ...formData } = mapped;
-            setProductOwnerUserId(_meta.ownerId);
             setIsAttachedProduct(_meta.attached);
             setForm((prev) => ({ ...prev, ...formData }));
           } else {
@@ -310,27 +308,22 @@ const EditInstallmentPlan = () => {
       const token = localStorage.getItem('userToken');
       const partnerUserId = form.userId || JSON.parse(localStorage.getItem('userData') || '{}')?.userId;
 
-      const productPatch = buildInstallmentUpdateBody({
+      await submitInstallmentPlanUpdate({
+        installmentId: id,
         form,
         editorUserId: partnerUserId,
         isAttachedProduct,
+        baseApi,
+        token,
       });
 
-      const res = await fetch(`${baseApi}/updateInstallment/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(productPatch),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setMessage("Installment plan updated successfully!");
-        setTimeout(() => navigate('/installments'), 2000);
-      } else {
-        setError(data.message || data.error || "Failed to update plan.");
-      }
+      const newCount = (form.paymentPlans || []).filter((p) => !p._id).length;
+      setMessage(
+        newCount
+          ? `Installment updated and ${newCount} new payment plan${newCount > 1 ? "s" : ""} added.`
+          : "Installment plan updated successfully!"
+      );
+      setTimeout(() => navigate('/installments'), 2000);
     } catch (err) {
       setError(err?.message || "Server error. Please try again.");
     } finally {

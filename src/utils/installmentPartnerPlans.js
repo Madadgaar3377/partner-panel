@@ -249,15 +249,38 @@ export const cashPriceForPlan = (plan, form) => {
   return deriveProductPrice(form.variants, form.price);
 };
 
+export const isExistingStoredPlan = (plan) => {
+  const id = plan?._id;
+  if (!id) return false;
+  const s = String(id);
+  return s.length >= 12 && s !== "undefined";
+};
+
+export const getPartnerProfileFromStorage = () => {
+  try {
+    const d = JSON.parse(localStorage.getItem("userData") || "{}");
+    return {
+      userId: d.userId || "",
+      companyName:
+        d.companyDetails?.companyName || d.companyName || d.name || "Partner",
+      companyLogo: d.profilePic || d.profileImage || "",
+    };
+  } catch {
+    return { userId: "", companyName: "Partner", companyLogo: "" };
+  }
+};
+
 const stripPlanForApi = (plan) => {
   const { _id, __v, createdAt, updatedAt, ...rest } = plan;
   return rest;
 };
 
-const mapPlanForApi = (plan, form, cashPriceOverride) => {
+export const mapPlanForApi = (plan, form, cashPriceOverride) => {
   const variantIndex = resolvePlanVariantIndex(plan, form.variants);
-  const cashPrice = cashPriceOverride ?? cashPriceForPlan({ ...plan, variantIndex: plan.variantIndex }, form);
-  return {
+  const cashPrice =
+    cashPriceOverride ??
+    cashPriceForPlan({ ...plan, variantIndex: plan.variantIndex }, form);
+  const mapped = {
     ...stripPlanForApi(plan),
     variantIndex,
     cashPrice,
@@ -269,18 +292,74 @@ const mapPlanForApi = (plan, form, cashPriceOverride) => {
     markup: Number(plan.markup) || 0,
     finance: plan.finance || { bankName: "", financeInfo: "" },
   };
+  if (plan._id) mapped._id = plan._id;
+  return mapped;
+};
+
+const attachPartnerMetaToPlan = (plan, profile, editorUserId, isNew) => {
+  const out = { ...plan };
+  if (isNew || !out.partnerId) {
+    out.partnerId = editorUserId || profile.userId;
+  }
+  if (!out.companyName) out.companyName = profile.companyName;
+  if (!out.companyLogo) out.companyLogo = profile.companyLogo;
+  return out;
+};
+
+export const enrichUpdatePayloadWithPartnerMeta = (patch, profile, editorUserId) => {
+  if (patch.paymentPlans) {
+    patch.paymentPlans = patch.paymentPlans.map((p) =>
+      attachPartnerMetaToPlan(p, profile, editorUserId, false)
+    );
+  }
+  if (patch.variants) {
+    patch.variants = patch.variants.map((v) => ({
+      ...v,
+      paymentPlans: (v.paymentPlans || []).map((p) =>
+        attachPartnerMetaToPlan(p, profile, editorUserId, false)
+      ),
+    }));
+  }
+  return patch;
+};
+
+export const buildAddPlanPayload = (plan, form, profile, editorUserId) => {
+  const productPrice = deriveProductPrice(form.variants, form.price);
+  const variantIdx = resolvePlanVariantIndex(plan, form.variants);
+  const base = mapPlanForApi(plan, form, cashPriceForPlan(plan, form));
+  return attachPartnerMetaToPlan(
+    {
+      ...base,
+      variantIndex: variantIdx,
+      userId: editorUserId || profile.userId,
+      partnerBasePrice: productPrice,
+      partnerVariantPricing: buildPartnerVariantPricing(form.variants),
+    },
+    profile,
+    editorUserId,
+    true
+  );
 };
 
 /** PUT body aligned with createInstallmentPlan POST shape */
-export const buildInstallmentUpdateBody = ({ form, editorUserId, isAttachedProduct }) => {
+export const buildInstallmentUpdateBody = ({
+  form,
+  editorUserId,
+  isAttachedProduct,
+  plansForUpdate,
+}) => {
+  const plansSource = plansForUpdate ?? form.paymentPlans ?? [];
   const productPrice = deriveProductPrice(form.variants, form.price);
-  const withPartnerId = (p, cashPrice) => ({
-    ...mapPlanForApi(p, form, cashPrice),
-    partnerId: p.partnerId || editorUserId,
-  });
+  const profile = getPartnerProfileFromStorage();
+
+  const withPartnerId = (p, cashPrice) => {
+    const mapped = mapPlanForApi(p, form, cashPrice);
+    const isNew = !isExistingStoredPlan(p);
+    return attachPartnerMetaToPlan(mapped, profile, editorUserId, isNew);
+  };
 
   const variantsPayload = (form.variants || []).map((v, vIdx) => {
-    const variantPlans = (form.paymentPlans || [])
+    const variantPlans = plansSource
       .filter((p) => Number(p.variantIndex) === vIdx)
       .map((p) => withPartnerId(p, getVariantEffectivePrice(v)));
 
@@ -300,7 +379,7 @@ export const buildInstallmentUpdateBody = ({ form, editorUserId, isAttachedProdu
     };
   });
 
-  const rootPlans = (form.paymentPlans || [])
+  const rootPlans = plansSource
     .filter(
       (p) =>
         p.variantIndex === null ||
@@ -346,4 +425,74 @@ export const buildInstallmentUpdateBody = ({ form, editorUserId, isAttachedProdu
     variants: variantsPayload,
     paymentPlans: rootPlans,
   };
+};
+
+/**
+ * Save installment: PUT updates existing plans + product; POST add-plan for each new plan
+ * (same as create flow — backend add-plan sets partnerId/companyName and attaches to variant).
+ */
+export const submitInstallmentPlanUpdate = async ({
+  installmentId,
+  form,
+  editorUserId,
+  isAttachedProduct,
+  baseApi,
+  token,
+}) => {
+  const profile = getPartnerProfileFromStorage();
+  const uid = editorUserId || profile.userId;
+
+  const existingPlans = (form.paymentPlans || []).filter(isExistingStoredPlan);
+  const newPlans = (form.paymentPlans || []).filter((p) => !isExistingStoredPlan(p));
+
+  const patch = buildInstallmentUpdateBody({
+    form,
+    editorUserId: uid,
+    isAttachedProduct,
+    plansForUpdate: existingPlans,
+  });
+
+  if (existingPlans.length === 0 && newPlans.length > 0) {
+    delete patch.paymentPlans;
+    if (isAttachedProduct) {
+      delete patch.variants;
+    }
+  }
+
+  enrichUpdatePayloadWithPartnerMeta(patch, profile, uid);
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const putRes = await fetch(`${baseApi}/updateInstallment/${installmentId}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(patch),
+  });
+  const putData = await putRes.json();
+  if (!putData.success) {
+    throw new Error(putData.message || putData.error || "Failed to update installment plan.");
+  }
+
+  for (const plan of newPlans) {
+    if (!plan.planName || !Number(plan.installmentPrice)) {
+      throw new Error(
+        `Plan "${plan.planName || "New plan"}" needs a name and valid total payable before saving.`
+      );
+    }
+    const planData = buildAddPlanPayload(plan, form, profile, uid);
+    const addRes = await fetch(`${baseApi}/installment/${installmentId}/add-plan`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(planData),
+    });
+    const addData = await addRes.json();
+    if (!addData.success) {
+      throw new Error(addData.message || addData.error || "Failed to add a payment plan.");
+    }
+  }
+
+  return putData;
 };

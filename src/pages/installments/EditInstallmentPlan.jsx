@@ -317,12 +317,7 @@ const EditInstallmentPlan = () => {
         token,
       });
 
-      const newCount = (form.paymentPlans || []).filter((p) => !p._id).length;
-      setMessage(
-        newCount
-          ? `Installment updated and ${newCount} new payment plan${newCount > 1 ? "s" : ""} added.`
-          : "Installment plan updated successfully!"
-      );
+      setMessage("Installment plan updated successfully!");
       setTimeout(() => navigate('/installments'), 2000);
     } catch (err) {
       setError(err?.message || "Server error. Please try again.");

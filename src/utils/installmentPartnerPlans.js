@@ -390,11 +390,14 @@ export const buildInstallmentUpdateBody = ({
     .map((p) => withPartnerId(p, productPrice));
 
   if (isAttachedProduct) {
+    const partnerBasePrice = Number(form.partnerBasePrice || form.price) || 0;
     return {
       userId: editorUserId,
       mergePartnerPlans: true,
       paymentPlans: rootPlans,
       variants: variantsPayload,
+      partnerBasePrice,
+      partnerVariantPricing: buildPartnerVariantPricing(form.variants),
     };
   }
 
@@ -428,8 +431,7 @@ export const buildInstallmentUpdateBody = ({
 };
 
 /**
- * Save installment: PUT updates existing plans + product; POST add-plan for each new plan
- * (same as create flow — backend add-plan sets partnerId/companyName and attaches to variant).
+ * Save installment edit: single PUT with full paymentPlans list (backend merges by partner).
  */
 export const submitInstallmentPlanUpdate = async ({
   installmentId,
@@ -442,22 +444,20 @@ export const submitInstallmentPlanUpdate = async ({
   const profile = getPartnerProfileFromStorage();
   const uid = editorUserId || profile.userId;
 
-  const existingPlans = (form.paymentPlans || []).filter(isExistingStoredPlan);
-  const newPlans = (form.paymentPlans || []).filter((p) => !isExistingStoredPlan(p));
+  for (const plan of form.paymentPlans || []) {
+    if (!plan.planName || !Number(plan.installmentPrice)) {
+      throw new Error(
+        `Plan "${plan.planName || "New plan"}" needs a name and valid total payable before saving.`
+      );
+    }
+  }
 
   const patch = buildInstallmentUpdateBody({
     form,
     editorUserId: uid,
     isAttachedProduct,
-    plansForUpdate: existingPlans,
+    plansForUpdate: form.paymentPlans,
   });
-
-  if (existingPlans.length === 0 && newPlans.length > 0) {
-    delete patch.paymentPlans;
-    if (isAttachedProduct) {
-      delete patch.variants;
-    }
-  }
 
   enrichUpdatePayloadWithPartnerMeta(patch, profile, uid);
 
@@ -474,24 +474,6 @@ export const submitInstallmentPlanUpdate = async ({
   const putData = await putRes.json();
   if (!putData.success) {
     throw new Error(putData.message || putData.error || "Failed to update installment plan.");
-  }
-
-  for (const plan of newPlans) {
-    if (!plan.planName || !Number(plan.installmentPrice)) {
-      throw new Error(
-        `Plan "${plan.planName || "New plan"}" needs a name and valid total payable before saving.`
-      );
-    }
-    const planData = buildAddPlanPayload(plan, form, profile, uid);
-    const addRes = await fetch(`${baseApi}/installment/${installmentId}/add-plan`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(planData),
-    });
-    const addData = await addRes.json();
-    if (!addData.success) {
-      throw new Error(addData.message || addData.error || "Failed to add a payment plan.");
-    }
   }
 
   return putData;

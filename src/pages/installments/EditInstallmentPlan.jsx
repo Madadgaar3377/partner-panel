@@ -13,24 +13,14 @@ import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 import {
-  filterPlansForEditor,
-  mapVariantsForEditor,
-  isAttachedMultiVendor,
+  DEFAULT_INSTALLMENT_PLAN,
+  getVariantEffectivePrice,
+  deriveProductPrice,
+  mapInstallmentPlanToForm,
   buildInstallmentUpdateBody,
 } from '../../utils/installmentPartnerPlans';
 
-const defaultPlan = {
-  planName: "",
-  cashPrice: 0,
-  installmentPrice: 0,
-  downPayment: 0,
-  monthlyInstallment: 0,
-  tenureMonths: 12,
-  interestRatePercent: 0,
-  interestType: "Flat Rate",
-  markup: 0,
-  otherChargesNote: "",
-};
+const defaultPlan = DEFAULT_INSTALLMENT_PLAN;
 
 const EditInstallmentPlan = () => {
   const navigate = useNavigate();
@@ -50,7 +40,12 @@ const EditInstallmentPlan = () => {
     productName: "",
     city: "",
     price: "",
+    partnerBasePrice: "",
     downpayment: "",
+    installment: "",
+    tenure: "",
+    customTenure: "",
+    postedBy: "Partner",
     videoUrl: "",
     description: "",
     companyName: "",
@@ -60,14 +55,13 @@ const EditInstallmentPlan = () => {
     status: "pending",
     productImages: [],
     paymentPlans: [{ ...defaultPlan }],
-
-    // New dynamic product specifications
     productSpecifications: {
       category: "",
       subCategory: "",
-      specifications: []
+      specifications: [],
     },
-    variants: [], // New: Product Variants
+    variants: [],
+    finance: { bankName: "", financeInfo: "" },
   });
 
   // Load userId from localStorage on component mount
@@ -106,50 +100,11 @@ const EditInstallmentPlan = () => {
         if (data.success) {
           const plan = data.data;
           if (plan) {
-            const ownerId = plan.userId || "";
-            setProductOwnerUserId(ownerId);
-            setIsAttachedProduct(isAttachedMultiVendor(partnerUserId, ownerId));
-
-            const myPlans = filterPlansForEditor(plan.paymentPlans, partnerUserId, ownerId);
-            const myVariants = mapVariantsForEditor(plan.variants, partnerUserId, ownerId);
-            // Initialize specifications based on category
-            let productSpecifications = {
-              category: plan.category || "",
-              subCategory: "",
-              specifications: []
-            };
-
-            // If plan has productSpecifications, use it
-            if (plan.productSpecifications && plan.productSpecifications.specifications) {
-              productSpecifications = plan.productSpecifications;
-            } else if (plan.category && CATEGORY_SPECIFICATIONS[plan.category]) {
-              // Migrate from old structure - initialize specs for the category
-              const specs = CATEGORY_SPECIFICATIONS[plan.category] || [];
-              productSpecifications.specifications = specs.map(spec => ({
-                field: spec.field,
-                value: ''
-              }));
-            }
-
-            setForm({
-              ...form,
-              userId: partnerUserId || form.userId,
-              productName: plan.productName || "",
-              city: plan.city || "",
-              price: plan.price || "",
-              downpayment: plan.downpayment || "",
-              videoUrl: plan.videoUrl || "",
-              description: plan.description || "",
-              companyName: plan.companyName || "",
-              companyNameOther: plan.companyNameOther || "",
-              category: plan.category || "",
-              customCategory: plan.customCategory || "",
-              status: plan.status || "pending",
-              productImages: plan.productImages || [],
-              paymentPlans: myPlans.length > 0 ? myPlans : [{ ...defaultPlan }],
-              productSpecifications: productSpecifications,
-              variants: myVariants,
-            });
+            const mapped = mapInstallmentPlanToForm(plan, partnerUserId);
+            const { _meta, ...formData } = mapped;
+            setProductOwnerUserId(_meta.ownerId);
+            setIsAttachedProduct(_meta.attached);
+            setForm((prev) => ({ ...prev, ...formData }));
           } else {
             setError('Installment plan not found');
           }
@@ -167,8 +122,15 @@ const EditInstallmentPlan = () => {
     if (id) {
       fetchInstallmentPlan();
     }
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (!fetchLoading && form.paymentPlans?.length) {
+      form.paymentPlans.forEach((_, idx) => recalcPlan(idx));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchLoading]);
 
   // Helper to update nested path safely
   const updateForm = (path, value) => {
@@ -245,10 +207,11 @@ const EditInstallmentPlan = () => {
       const pp = [...f.paymentPlans];
       const p = { ...pp[index] };
 
-      let cashPrice = Number(p.cashPrice) || Number(f.price) || 0;
-      // Use variant price if assigned
+      let cashPrice = 0;
       if (p.variantIndex !== undefined && p.variantIndex !== null && p.variantIndex !== -1 && f.variants?.[p.variantIndex]) {
-        cashPrice = Number(p.cashPrice) || Number(f.variants[p.variantIndex].price) || 0;
+        cashPrice = getVariantEffectivePrice(f.variants[p.variantIndex]);
+      } else {
+        cashPrice = deriveProductPrice(f.variants, f.price);
       }
 
       const downPayment = Number(p.downPayment) || 0;
@@ -294,11 +257,11 @@ const EditInstallmentPlan = () => {
   };
 
   useEffect(() => {
-    if (form.paymentPlans.length && form.price) {
+    if (form.paymentPlans.length) {
       form.paymentPlans.forEach((_, idx) => recalcPlan(idx));
     }
     // eslint-disable-next-line
-  }, [form.price]);
+  }, [form.price, form.variants]);
 
   // --- Image Handling ---
   const handleFilesChange = (e) => {
@@ -351,7 +314,6 @@ const EditInstallmentPlan = () => {
         form,
         editorUserId: partnerUserId,
         isAttachedProduct,
-        includeFullForm: !isAttachedProduct,
       });
 
       const res = await fetch(`${baseApi}/updateInstallment/${id}`, {
@@ -367,19 +329,43 @@ const EditInstallmentPlan = () => {
         setMessage("Installment plan updated successfully!");
         setTimeout(() => navigate('/installments'), 2000);
       } else {
-        setError(data.message || "Failed to update plan.");
+        setError(data.message || data.error || "Failed to update plan.");
       }
     } catch (err) {
-      setError("Server error. Please try again.");
+      setError(err?.message || "Server error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const showVariantSection = Boolean(form.category);
+  const fieldsLocked = isAttachedProduct;
+
   const isStepValid = () => {
-    if (step === 1) return form.productName && form.city && form.price && form.category;
-    if (step === 3) return form.productImages.length > 0;
-    if (step === 4) return form.paymentPlans.length > 0;
+    if (step === 1) return form.productName && form.city && form.category;
+    if (step === 3 && !fieldsLocked) return form.productImages.length > 0;
+    if (step === 4) {
+      if (!form.paymentPlans.length) return false;
+      if (showVariantSection && !fieldsLocked) {
+        if (form.variants.length === 0) return false;
+        if (form.variants.some((v) => !v.variantName || !Number(v.price))) return false;
+      }
+      if (showVariantSection && fieldsLocked) {
+        const planVariantIdxs = form.paymentPlans
+          .map((p) => p.variantIndex)
+          .filter((ix) => ix !== null && ix !== undefined && ix !== -1 && ix !== "");
+        if (form.variants.length > 0 && planVariantIdxs.length > 0) {
+          if (!planVariantIdxs.every((ix) => Number(form.variants[Number(ix)]?.price) > 0)) return false;
+        } else if (form.variants.length > 0) {
+          if (!form.variants.some((v) => Number(v.price) > 0)) return false;
+        } else if (!Number(form.price)) {
+          return false;
+        }
+      }
+      if (!showVariantSection && !fieldsLocked && !Number(form.price)) return false;
+      if (!showVariantSection && fieldsLocked && !Number(form.price)) return false;
+      return form.paymentPlans.every((p) => p.planName && Number(p.installmentPrice) > 0);
+    }
     return true;
   };
 
@@ -476,10 +462,19 @@ const EditInstallmentPlan = () => {
               <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-red-600 pl-4">
                 Basic Product Details
               </h2>
+
+              {fieldsLocked && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+                  <h3 className="text-lg font-bold text-blue-800 mb-2">Shared catalog product</h3>
+                  <p className="text-sm text-blue-600">
+                    Product details are from the main listing and cannot be changed here. Update your cash prices and payment plans in step 4.
+                  </p>
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <InputField
-                  label="User ID"
+                  label="Partner ID"
                   value={form.userId}
                   onChange={() => {}}
                   placeholder="Loading..."
@@ -491,6 +486,7 @@ const EditInstallmentPlan = () => {
                   value={form.productName}
                   onChange={v => updateForm('productName', v)}
                   placeholder="Enter product name"
+                  readOnly={fieldsLocked}
                 />
                 
                 <InputField
@@ -498,14 +494,7 @@ const EditInstallmentPlan = () => {
                   value={form.city}
                   onChange={v => updateForm('city', v)}
                   placeholder="e.g., Lahore"
-                />
-
-                <InputField
-                  label="Base Price (PKR) *"
-                  type="number"
-                  value={form.price}
-                  onChange={v => updateForm('price', v)}
-                  placeholder="0"
+                  readOnly={fieldsLocked}
                 />
 
                 <div className="space-y-2">
@@ -515,7 +504,8 @@ const EditInstallmentPlan = () => {
                   <select
                     value={form.category}
                     onChange={e => handleCategoryChange(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                    disabled={fieldsLocked}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
                   >
                     <option value="">Select Category</option>
                     {Object.entries(getGroupedCategories()).map(([group, categories]) => (
@@ -533,6 +523,7 @@ const EditInstallmentPlan = () => {
                   value={form.companyName}
                   onChange={v => updateForm('companyName', v)}
                   placeholder="e.g., Samsung"
+                  readOnly={fieldsLocked}
                 />
 
                 <InputField
@@ -540,6 +531,7 @@ const EditInstallmentPlan = () => {
                   value={form.videoUrl}
                   onChange={v => updateForm('videoUrl', v)}
                   placeholder="https://..."
+                  readOnly={fieldsLocked}
                 />
               </div>
 
@@ -551,7 +543,8 @@ const EditInstallmentPlan = () => {
                   value={form.description}
                   onChange={e => updateForm('description', e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all resize-none"
+                  disabled={fieldsLocked}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all resize-none disabled:bg-gray-100 disabled:text-gray-500"
                   placeholder="Describe the product..."
                 />
               </div>
@@ -590,7 +583,8 @@ const EditInstallmentPlan = () => {
                             onChange={e => updateSpecification(spec.field, e.target.value)}
                             placeholder={spec.placeholder || `Enter ${spec.field.toLowerCase()}`}
                             required={spec.required}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                            disabled={fieldsLocked}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
                           />
                         </div>
                       ) : spec.type === 'select' ? (
@@ -602,7 +596,8 @@ const EditInstallmentPlan = () => {
                             value={getSpecValue(spec.field)}
                             onChange={e => updateSpecification(spec.field, e.target.value)}
                             required={spec.required}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                            disabled={fieldsLocked}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none disabled:bg-gray-100 disabled:text-gray-500"
                           >
                             <option value="">Select {spec.field}</option>
                             {spec.options?.map((option, i) => (
@@ -621,86 +616,13 @@ const EditInstallmentPlan = () => {
                             placeholder={spec.placeholder || `Enter ${spec.field.toLowerCase()}`}
                             required={spec.required}
                             rows={3}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all resize-none"
+                            disabled={fieldsLocked}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all resize-none disabled:bg-gray-100 disabled:text-gray-500"
                           />
                         </div>
                       ) : null}
                     </div>
                   ))}
-                </div>
-              )}
-
-              {/* Product Variants Section */}
-              {form.category && (
-                <div className="mt-8 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-gray-800">Product Variants</h3>
-                    <button 
-                      type="button"
-                      onClick={() => setForm(f => ({
-                        ...f,
-                        variants: [...f.variants, { 
-                          variantName: "", 
-                          price: f.price || 0,
-                          discountPercent: 0,
-                          paymentPlans: [],
-                          status: "active" 
-                        }]
-                      }))}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                    >
-                      + Add Variant
-                    </button>
-                  </div>
-                  <div className="space-y-4">
-                    {form.variants.map((variant, vIdx) => (
-                      <div key={vIdx} className="p-6 bg-white border border-gray-200 rounded-xl relative shadow-sm">
-                        <button 
-                          type="button"
-                          onClick={() => setForm(f => ({
-                            ...f,
-                            variants: f.variants.filter((_, i) => i !== vIdx)
-                          }))}
-                          className="absolute top-4 right-4 text-gray-400 hover:text-red-600"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <InputField 
-                            label="Variant Name" 
-                            value={variant.variantName} 
-                            onChange={v => {
-                              const newVariants = [...form.variants];
-                              newVariants[vIdx].variantName = v;
-                              setForm(f => ({ ...f, variants: newVariants }));
-                            }}
-                            placeholder="e.g. 12/256GB"
-                          />
-                          <InputField 
-                            label="Cash Price (₨)" 
-                            type="number"
-                            value={variant.price} 
-                            onChange={v => {
-                              const newVariants = [...form.variants];
-                              newVariants[vIdx].price = v;
-                              setForm(f => ({ ...f, variants: newVariants }));
-                            }}
-                          />
-                          <InputField 
-                            label="Discount (%)" 
-                            type="number"
-                            value={variant.discountPercent ?? ""} 
-                            onChange={v => {
-                              const newVariants = [...form.variants];
-                              newVariants[vIdx].discountPercent = v;
-                              setForm(f => ({ ...f, variants: newVariants }));
-                            }}
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
             </div>
@@ -723,13 +645,15 @@ const EditInstallmentPlan = () => {
                     {form.productImages.map((url, i) => (
                       <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
                         <img src={url} className="w-full h-full object-cover" alt="" />
-                        <button
-                          type="button"
-                          onClick={() => updateForm('productImages', form.productImages.filter((_, idx) => idx !== i))}
-                          className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        {!fieldsLocked && (
+                          <button
+                            type="button"
+                            onClick={() => updateForm('productImages', form.productImages.filter((_, idx) => idx !== i))}
+                            className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     ))}
                     
@@ -743,24 +667,26 @@ const EditInstallmentPlan = () => {
                       </div>
                     ))}
 
-                    {/* Add button */}
-                    <label className="aspect-square rounded-lg border-4 border-dashed border-gray-300 hover:border-red-500 hover:bg-red-50 transition-all flex flex-col items-center justify-center cursor-pointer group">
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleFilesChange}
-                      />
-                      <ImageIcon className="w-8 h-8 text-gray-400 group-hover:text-red-600 transition-colors" />
-                      <span className="text-xs font-medium text-gray-500 group-hover:text-red-600 mt-2">
-                        Add Images
-                      </span>
-                    </label>
+                    {!fieldsLocked && (
+                      <label className="aspect-square rounded-lg border-4 border-dashed border-gray-300 hover:border-red-500 hover:bg-red-50 transition-all flex flex-col items-center justify-center cursor-pointer group">
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleFilesChange}
+                        />
+                        <ImageIcon className="w-8 h-8 text-gray-400 group-hover:text-red-600 transition-colors" />
+                        <span className="text-xs font-medium text-gray-500 group-hover:text-red-600 mt-2">
+                          Add Images
+                        </span>
+                      </label>
+                    )}
                   </div>
                 </div>
 
                 {/* Upload Panel */}
+                {!fieldsLocked && (
                 <div className="bg-gradient-to-br from-red-600 to-red-700 rounded-xl p-8 flex flex-col justify-center items-center text-center space-y-6 text-white">
                   <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
                     <Upload className="w-8 h-8" />
@@ -780,6 +706,7 @@ const EditInstallmentPlan = () => {
                     {uploading ? 'Uploading...' : `Upload ${localImages.length || ''} Image${localImages.length !== 1 ? 's' : ''}`}
                   </button>
                 </div>
+                )}
               </div>
             </div>
           )}
@@ -789,13 +716,13 @@ const EditInstallmentPlan = () => {
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-red-600 pl-4">
-                  Payment Plans
+                  Variants & Payment Plans
                 </h2>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="text-xs text-gray-500">Product Price</p>
+                    <p className="text-xs text-gray-500">Reference cash price</p>
                     <p className="text-xl font-bold text-red-600">
-                      ₨ {Number(form.price || 0).toLocaleString()}
+                      ₨ {deriveProductPrice(form.variants, form.price).toLocaleString()}
                     </p>
                   </div>
                   <button
@@ -808,6 +735,63 @@ const EditInstallmentPlan = () => {
                 </div>
               </div>
 
+              {showVariantSection && (
+                <div className="space-y-4 p-6 bg-blue-50 border border-blue-200 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      {!fieldsLocked && (
+                        <>
+                          <h3 className="text-lg font-bold text-gray-800">Product Variants</h3>
+                          <p className="text-sm text-gray-600 mt-1">Add variant options with cash price and optional discount (% off cash price).</p>
+                        </>
+                      )}
+                    </div>
+                    {!fieldsLocked && (
+                      <button type="button" onClick={() => setForm(f => ({ ...f, variants: [...f.variants, { variantName: "", price: "", discountPercent: 0, status: "active" }] }))} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">+ Add Variant</button>
+                    )}
+                  </div>
+                  {form.variants.length === 0 ? (
+                    <p className="text-sm text-gray-500 py-4 text-center">{fieldsLocked ? "This product has no variants. Use your cash price below." : "Add at least one variant before creating payment plans."}</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {form.variants.map((variant, vIdx) => (
+                        <div key={vIdx} className="p-4 bg-white border border-gray-200 rounded-xl relative">
+                          {!fieldsLocked && (
+                            <button type="button" onClick={() => setForm(f => ({ ...f, variants: f.variants.filter((_, i) => i !== vIdx) }))} className="absolute top-3 right-3 text-gray-400 hover:text-red-600"><X className="w-5 h-5" /></button>
+                          )}
+                          {fieldsLocked ? (
+                            <div className="space-y-4">
+                              <div className="space-y-1">
+                                <span className="text-xs font-medium text-gray-500">Product variant (from listing — not editable)</span>
+                                <p className="text-base font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 cursor-default">{variant.variantName || `Variant ${vIdx + 1}`}</p>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <InputField label="Your Cash Price (₨) *" type="number" value={variant.price} onChange={v => { const nv = [...form.variants]; nv[vIdx].price = v; setForm(f => ({ ...f, variants: nv })); }} />
+                                <InputField label="Your Discount (%)" type="number" value={variant.discountPercent ?? ""} onChange={v => { const nv = [...form.variants]; nv[vIdx].discountPercent = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="0" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 pr-8">
+                              <InputField label="Variant Name *" value={variant.variantName} onChange={v => { const nv = [...form.variants]; nv[vIdx].variantName = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="e.g. 12GB / 256GB" />
+                              <InputField label="Cash Price (₨) *" type="number" value={variant.price} onChange={v => { const nv = [...form.variants]; nv[vIdx].price = v; setForm(f => ({ ...f, variants: nv })); }} />
+                              <InputField label="Discount (%)" type="number" value={variant.discountPercent ?? ""} onChange={v => { const nv = [...form.variants]; nv[vIdx].discountPercent = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="0" />
+                              <div className="flex flex-col justify-end">
+                                <span className="text-xs text-gray-500">Effective cash price</span>
+                                <span className="text-lg font-bold text-red-600">₨ {getVariantEffectivePrice(variant).toLocaleString()}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!showVariantSection && (
+                <InputField label={fieldsLocked ? "Your Cash Price (₨)" : "Cash Price (₨) *"} type="number" value={form.price} onChange={v => updateForm('price', v)} placeholder="Cash price for installment calculations" />
+              )}
+
               <div className="space-y-6">
                 {form.paymentPlans.map((p, idx) => (
                   <PaymentPlanCard
@@ -818,6 +802,7 @@ const EditInstallmentPlan = () => {
                     setForm={setForm}
                     recalcPlan={recalcPlan}
                     canRemove={form.paymentPlans.length > 1}
+                    fieldsLocked={fieldsLocked}
                   />
                 ))}
               </div>
@@ -885,7 +870,7 @@ const InputField = ({ label, value, onChange, type = "text", placeholder = "", r
 );
 
 // Payment Plan Card Component
-const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) => {
+const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove, fieldsLocked }) => {
   const updatePlan = (field, value) => {
     const pp = [...form.paymentPlans];
     pp[index][field] = value;
@@ -893,7 +878,10 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) 
     setTimeout(() => recalcPlan(index), 0);
   };
 
-  const financedAmount = Math.max(0, (parseFloat(form.price) || 0) - (plan.downPayment || 0));
+  const planCashPrice =
+    plan.variantIndex !== null && plan.variantIndex !== undefined && form.variants[plan.variantIndex]
+      ? getVariantEffectivePrice(form.variants[plan.variantIndex])
+      : deriveProductPrice(form.variants, form.price);
 
   return (
     <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-200 relative">
@@ -908,6 +896,7 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) 
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        {form.variants.length > 0 && (
         <div className="md:col-span-1 space-y-2">
           <label className="block text-sm font-medium text-gray-700">Applies To Variant</label>
           <select 
@@ -920,26 +909,19 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) 
             }}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white text-sm"
           >
-            <option value="-1">All Variants / Base</option>
+            <option value="-1">{fieldsLocked && form.variants.length > 0 ? "— Select variant —" : "Standard (no variant)"}</option>
             {form.variants.map((v, vIdx) => (
-              <option key={vIdx} value={vIdx}>{v.variantName} (₨ {v.price})</option>
+              <option key={vIdx} value={vIdx}>{v.variantName} (₨ {getVariantEffectivePrice(v).toLocaleString()})</option>
             ))}
           </select>
         </div>
+        )}
 
         <InputField
           label="Plan Name"
           value={plan.planName}
           onChange={v => updatePlan('planName', v)}
           placeholder="e.g., 12-Month Plan"
-        />
-
-        <InputField
-          label="Partner Cash Price (₨)"
-          type="number"
-          value={plan.cashPrice}
-          onChange={v => updatePlan('cashPrice', v)}
-          placeholder="0"
         />
 
         <div className="space-y-2">
@@ -1015,7 +997,7 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove }) 
           <SummaryItem label="Total Markup" value={plan.markup} />
           <SummaryItem label="Total Payable" value={plan.installmentPrice} />
           <SummaryItem label="Customer Cost" value={plan.totalCostToCustomer} highlight />
-          <SummaryItem label="Financed Amount" value={Math.max(0, (Number(plan.cashPrice) || (plan.variantIndex !== null && plan.variantIndex !== undefined && form.variants[plan.variantIndex] ? parseFloat(form.variants[plan.variantIndex].price) : parseFloat(form.price) || 0)) - (plan.downPayment || 0))} />
+          <SummaryItem label="Financed Amount" value={Math.max(0, planCashPrice - (plan.downPayment || 0))} />
         </div>
       </div>
     </div>

@@ -23,6 +23,10 @@ import {
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
+import {
+  getStoredPlanInfo,
+  resolveAppliedPlanDisplay,
+} from '../../utils/applicationPlanDetails';
 
 const InstallmentRequests = () => {
   const navigate = useNavigate();
@@ -30,6 +34,7 @@ const InstallmentRequests = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [catalogPlan, setCatalogPlan] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -77,23 +82,52 @@ const InstallmentRequests = () => {
   }, [navigate, fetchRequests]);
 
   const fetchApplicationDetails = async (applicationId) => {
+    const fromList = requests.find(
+      (r) => String(r.applicationId) === String(applicationId)
+    );
+    setSelectedRequest(fromList || { applicationId });
+    setCatalogPlan(null);
     setDetailLoading(true);
     try {
       const token = localStorage.getItem('userToken');
-      const response = await fetch(`${baseApi}/getApplication/${applicationId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const planId = fromList?.installmentPlanId
+        ? encodeURIComponent(fromList.installmentPlanId)
+        : null;
 
-      const data = await response.json();
-      
-      if (data.success) {
-        setSelectedRequest(data.data);
+      const fetches = [
+        fetch(`${baseApi}/getApplication/${applicationId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ];
+      if (planId) {
+        fetches.push(
+          fetch(`${baseApi}/getInstallment/${planId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        );
+      }
+
+      const results = await Promise.all(fetches);
+      const appData = await results[0].json();
+      if (appData.success && appData.data) {
+        setSelectedRequest(appData.data);
+        const pid = appData.data.installmentPlanId;
+        if (results[1] && pid) {
+          const planData = await results[1].json();
+          if (planData.success && planData.data) setCatalogPlan(planData.data);
+        } else if (pid && !planId) {
+          const planRes = await fetch(`${baseApi}/getInstallment/${encodeURIComponent(pid)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const planJson = await planRes.json();
+          if (planJson.success && planJson.data) setCatalogPlan(planJson.data);
+        }
       } else {
-        setError(data.message || 'Failed to fetch application details');
+        setError(appData.message || 'Failed to fetch application details');
       }
     } catch (err) {
       console.error('Fetch application details error:', err);
@@ -324,7 +358,7 @@ const InstallmentRequests = () => {
             <div className="space-y-4">
               {requests.map((request) => {
                 const userInfo = request.UserInfo?.[0] || {};
-                const planInfo = request.PlanInfo?.[0] || {};
+                const planInfo = getStoredPlanInfo(request) || {};
 
                 return (
                   <div
@@ -447,13 +481,16 @@ const InstallmentRequests = () => {
         {selectedRequest && (
           <div 
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-            onClick={() => setSelectedRequest(null)}
+            onClick={() => {
+              setSelectedRequest(null);
+              setCatalogPlan(null);
+            }}
           >
             <div 
               className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              {detailLoading ? (
+              {detailLoading && !selectedRequest?.UserInfo ? (
                 <div className="p-12 text-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent mx-auto mb-4"></div>
                   <p className="text-gray-600">Loading application details...</p>
@@ -469,7 +506,10 @@ const InstallmentRequests = () => {
                       </p>
                     </div>
                     <button
-                      onClick={() => setSelectedRequest(null)}
+                      onClick={() => {
+                        setSelectedRequest(null);
+                        setCatalogPlan(null);
+                      }}
                       className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     >
                       <X className="w-6 h-6 text-gray-600" />
@@ -506,23 +546,130 @@ const InstallmentRequests = () => {
                       </div>
                     )}
 
-                    {/* Plan Information */}
-                    {selectedRequest.PlanInfo && selectedRequest.PlanInfo[0] && (
+                    {/* Plan Information — same fields as client dashboard, no images */}
+                    {(getStoredPlanInfo(selectedRequest) || catalogPlan || selectedRequest.installmentPlanId) && (() => {
+                      const plan = resolveAppliedPlanDisplay(selectedRequest, catalogPlan);
+                      const fmt = (n) =>
+                        n != null ? `₨ ${Number(n).toLocaleString()}` : 'N/A';
+                      const showDown = plan.downPayment != null && Number(plan.downPayment) > 0;
+                      const variantLabel =
+                        plan.variantInfo?.variantName || plan.matchedVariant?.variantName || plan.variantName;
+                      return (
+                        <div className="border border-blue-200 rounded-lg p-5 bg-gradient-to-br from-blue-50 to-blue-100">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-green-100 rounded-lg">
+                              <FileText className="w-5 h-5 text-green-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-800">Plan You Applied For</h3>
+                          </div>
+                          {detailLoading && plan.monthlyInstallment == null && !plan.productName ? (
+                            <p className="text-sm text-gray-600">Loading plan details...</p>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {plan.productName && (
+                                <div className="md:col-span-2">
+                                  <PlanDetailField label="Product" value={plan.productName} bold />
+                                  {(plan.productCategory || plan.productCity) && (
+                                    <p className="text-sm text-gray-600 mt-0.5">
+                                      {[plan.productCategory, plan.productCity].filter(Boolean).join(' · ')}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                              {variantLabel && (
+                                <PlanDetailField label="Variant" value={variantLabel} bold />
+                              )}
+                              <PlanDetailField label="Plan Name" value={plan.planName} bold />
+                              {plan.companyName && (
+                                <PlanDetailField label="Offered By" value={plan.companyName} bold />
+                              )}
+                              <PlanDetailField
+                                label="Installment Price"
+                                value={fmt(plan.installmentPrice)}
+                                valueClass="text-blue-700"
+                              />
+                              {plan.cashPrice != null && Number(plan.cashPrice) > 0 && (
+                                <PlanDetailField label="Cash Price" value={fmt(plan.cashPrice)} />
+                              )}
+                              {showDown && (
+                                <PlanDetailField
+                                  label="Down Payment"
+                                  value={fmt(plan.downPayment)}
+                                  valueClass="text-green-700"
+                                />
+                              )}
+                              <PlanDetailField
+                                label="Monthly Installment"
+                                value={fmt(plan.monthlyInstallment)}
+                                valueClass="text-red-700"
+                              />
+                              <PlanDetailField
+                                label="Tenure"
+                                value={
+                                  plan.tenureMonths != null && plan.tenureMonths > 0
+                                    ? `${plan.tenureMonths} months`
+                                    : 'N/A'
+                                }
+                              />
+                              {plan.interestRatePercent != null && plan.interestRatePercent > 0 && (
+                                <PlanDetailField
+                                  label="Markup / Interest Rate"
+                                  value={
+                                    plan.interestType
+                                      ? `${plan.interestRatePercent}% (${plan.interestType})`
+                                      : `${plan.interestRatePercent}%`
+                                  }
+                                />
+                              )}
+                              {plan.markup != null && Number(plan.markup) > 0 && (
+                                <PlanDetailField label="Total Markup" value={fmt(plan.markup)} />
+                              )}
+                              {plan.installmentPlanId && (
+                                <div className="md:col-span-2">
+                                  <p className="text-xs text-gray-500 font-medium uppercase">Product ID</p>
+                                  <p className="text-sm font-mono text-gray-800 mt-1">{plan.installmentPlanId}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Assigned Agent */}
+                    {(selectedRequest.agentDetails || selectedRequest.assigenAgent) && (
                       <div className="border border-gray-200 rounded-lg p-5">
                         <div className="flex items-center gap-3 mb-4">
-                          <div className="p-2 bg-green-100 rounded-lg">
-                            <FileText className="w-5 h-5 text-green-600" />
+                          <div className="p-2 bg-purple-100 rounded-lg">
+                            <Users className="w-5 h-5 text-purple-600" />
                           </div>
-                          <h3 className="text-lg font-bold text-gray-800">Plan Details</h3>
+                          <h3 className="text-lg font-bold text-gray-800">Assigned Agent</h3>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <InfoItem label="Plan Name" value={selectedRequest.PlanInfo[0].planName} />
-                          <InfoItem label="Plan Price" value={`₨ ${Number(selectedRequest.PlanInfo[0].planPrice || 0).toLocaleString()}`} icon={DollarSign} />
-                          <InfoItem label="Monthly Installment" value={`₨ ${Number(selectedRequest.PlanInfo[0].monthlyInstallment || 0).toLocaleString()}`} icon={DollarSign} />
-                          <InfoItem label="Tenure" value={`${selectedRequest.PlanInfo[0].tenureMonths || 0} months`} icon={Calendar} />
-                          <InfoItem label="Down Payment" value={`₨ ${Number(selectedRequest.PlanInfo[0].downPayment || 0).toLocaleString()}`} icon={DollarSign} />
-                          <InfoItem label="Interest Rate" value={`${selectedRequest.PlanInfo[0].interestRatePercent || 0}%`} />
-                        </div>
+                        {detailLoading && !selectedRequest.agentDetails?.name ? (
+                          <p className="text-sm text-gray-500">Loading agent details...</p>
+                        ) : selectedRequest.agentDetails ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <InfoItem label="Name" value={selectedRequest.agentDetails.name} icon={User} />
+                            <InfoItem
+                              label="Agent ID"
+                              value={selectedRequest.agentDetails.userId || selectedRequest.assigenAgent}
+                            />
+                            <InfoItem label="Email" value={selectedRequest.agentDetails.email} icon={Mail} />
+                            <InfoItem label="Phone" value={selectedRequest.agentDetails.phoneNumber} icon={Phone} />
+                            <InfoItem
+                              label="WhatsApp"
+                              value={selectedRequest.agentDetails.WhatsappNumber}
+                              icon={Phone}
+                            />
+                            <InfoItem
+                              label="Address"
+                              value={selectedRequest.agentDetails.Address}
+                              icon={MapPin}
+                            />
+                          </div>
+                        ) : (
+                          <InfoItem label="Agent ID" value={selectedRequest.assigenAgent} />
+                        )}
                       </div>
                     )}
 
@@ -638,7 +785,10 @@ const InstallmentRequests = () => {
                   </div>
 
                   <button
-                    onClick={() => setSelectedRequest(null)}
+                    onClick={() => {
+                      setSelectedRequest(null);
+                      setCatalogPlan(null);
+                    }}
                     className="mt-6 w-full px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-medium"
                   >
                     Close
@@ -652,6 +802,15 @@ const InstallmentRequests = () => {
     </div>
   );
 };
+
+const PlanDetailField = ({ label, value, bold, valueClass = 'text-gray-900' }) => (
+  <div>
+    <p className="text-xs font-semibold text-gray-600 uppercase">{label}</p>
+    <p className={`text-base mt-1 ${bold ? 'font-bold' : 'font-semibold'} ${valueClass}`}>
+      {value || 'N/A'}
+    </p>
+  </div>
+);
 
 // Info Item Component
 const InfoItem = ({ label, value, icon: Icon }) => {

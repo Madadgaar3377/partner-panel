@@ -20,7 +20,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { PRODUCT_CATEGORIES } from '../../constants/productCategories';
-import { filterPlansForEditor } from '../../utils/installmentPartnerPlans';
+import {
+  filterPlansForEditor,
+  getOtherPartnersPlans,
+  flattenAllPlansWithMeta,
+  isProductOwnerForPartner,
+  getProductOwnerUserId,
+} from '../../utils/installmentPartnerPlans';
 
 const InstallmentDetail = () => {
   const navigate = useNavigate();
@@ -54,17 +60,7 @@ const InstallmentDetail = () => {
       if (data.success) {
         const found = data.data;
         if (found) {
-          const ownerId = found.userId || "";
-          const myRootPlans = filterPlansForEditor(found.paymentPlans, partnerUserId, ownerId);
-          const myVariants = (found.variants || []).map((v) => ({
-            ...v,
-            paymentPlans: filterPlansForEditor(v.paymentPlans, partnerUserId, ownerId),
-          }));
-          setInstallment({
-            ...found,
-            paymentPlans: myRootPlans,
-            variants: myVariants,
-          });
+          setInstallment(found);
         } else {
           setError('Installment plan not found');
         }
@@ -126,6 +122,68 @@ const InstallmentDetail = () => {
 
   const creator = installment.createdBy?.[0] || {};
   const images = installment.productImages || [];
+  const partnerUserId = JSON.parse(localStorage.getItem('userData') || '{}')?.userId;
+  const ownerId = getProductOwnerUserId(installment);
+  const isOwner = isProductOwnerForPartner(installment, partnerUserId);
+  const myPlanEntries = flattenAllPlansWithMeta(installment).filter(
+    ({ plan }) =>
+      (plan?.partnerId && String(plan.partnerId) === String(partnerUserId)) ||
+      (!plan?.partnerId && isOwner)
+  );
+  const otherPlanEntries = getOtherPartnersPlans(installment, partnerUserId);
+
+  const renderPlanCard = (entry, keyPrefix) => {
+    const { plan, variantName } = entry;
+    return (
+      <div
+        key={`${keyPrefix}-${plan._id || entry.planIndex}-${entry.location}`}
+        className="p-6 bg-white rounded-lg border-2 border-blue-200"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h3 className="text-xl font-bold text-gray-800">
+            {plan.planName || 'Payment Plan'}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {variantName && (
+              <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
+                {variantName}
+              </span>
+            )}
+            {plan.companyName && (
+              <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">
+                {plan.companyName}
+              </span>
+            )}
+            {plan.tenureMonths > 0 && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                {plan.tenureMonths} months
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {plan.installmentPrice > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Installment Price</p>
+              <p className="text-lg font-bold text-gray-800">₨ {Number(plan.installmentPrice).toLocaleString()}</p>
+            </div>
+          )}
+          {plan.monthlyInstallment > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Monthly</p>
+              <p className="text-lg font-bold text-green-600">₨ {Number(plan.monthlyInstallment).toLocaleString()}</p>
+            </div>
+          )}
+          {plan.downPayment > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Down Payment</p>
+              <p className="text-lg font-bold text-gray-800">₨ {Number(plan.downPayment).toLocaleString()}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
@@ -262,80 +320,34 @@ const InstallmentDetail = () => {
               )}
             </div>
 
-            {/* Payment Plans */}
-            {installment.paymentPlans && installment.paymentPlans.length > 0 && (
+            {!isOwner && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
+                <strong>Shared product:</strong> Created by {installment.ownerCompanyName || installment.companyName || 'another partner'}.
+                You can add, edit, or delete <strong>only your payment plans</strong> — not the whole listing.
+              </div>
+            )}
+
+            {myPlanEntries.length > 0 && (
               <div className="glass-red rounded-xl shadow-lg p-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                   <Package className="w-6 h-6 text-blue-600" />
-                  Your Payment Plans
+                  Your Payment Plans ({myPlanEntries.length})
                 </h2>
-                <p className="text-sm text-gray-500 mb-4 -mt-4">Only plans from your company are shown here.</p>
                 <div className="space-y-4">
-                  {installment.paymentPlans.map((plan, index) => (
-                    <div 
-                      key={index}
-                      className="p-6 bg-white rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-bold text-gray-800">
-                          {plan.planName || `Plan ${index + 1}`}
-                        </h3>
-                        <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-semibold rounded-full">
-                          {plan.tenureMonths} Months
-                        </span>
-                      </div>
+                  {myPlanEntries.map((entry) => renderPlanCard(entry, 'mine'))}
+                </div>
+              </div>
+            )}
 
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {plan.installmentPrice > 0 && (
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">Plan Price</p>
-                            <p className="text-lg font-bold text-gray-800">
-                              ₨ {plan.installmentPrice.toLocaleString()}
-                            </p>
-                          </div>
-                        )}
-                        {plan.downPayment > 0 && (
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">Down Payment</p>
-                            <p className="text-lg font-bold text-gray-800">
-                              ₨ {plan.downPayment.toLocaleString()}
-                            </p>
-                          </div>
-                        )}
-                        {plan.monthlyInstallment > 0 && (
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">Monthly Installment</p>
-                            <p className="text-lg font-bold text-green-600">
-                              ₨ {plan.monthlyInstallment.toLocaleString()}
-                            </p>
-                          </div>
-                        )}
-                        {plan.interestRatePercent > 0 && (
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">Interest Rate</p>
-                            <p className="text-lg font-bold text-gray-800">
-                              {plan.interestRatePercent}%
-                            </p>
-                          </div>
-                        )}
-                        {plan.interestType && (
-                          <div className="md:col-span-2">
-                            <p className="text-xs text-gray-500 mb-1">Interest Type</p>
-                            <p className="text-sm font-medium text-gray-700">
-                              {plan.interestType}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {plan.otherChargesNote && (
-                        <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
-                          <p className="text-xs text-yellow-700 font-semibold mb-1">Note:</p>
-                          <p className="text-sm text-yellow-800">{plan.otherChargesNote}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+            {otherPlanEntries.length > 0 && (
+              <div className="glass-red rounded-xl shadow-lg p-8 border border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+                  <Package className="w-6 h-6 text-gray-500" />
+                  Other Companies&apos; Plans ({otherPlanEntries.length})
+                </h2>
+                <p className="text-sm text-gray-500 mb-4">Read-only — visible on the shared listing.</p>
+                <div className="space-y-4 opacity-90">
+                  {otherPlanEntries.map((entry) => renderPlanCard(entry, 'other'))}
                 </div>
               </div>
             )}

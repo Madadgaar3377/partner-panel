@@ -72,10 +72,14 @@ const Dashboard = () => {
 
   const stats = dashboardData?.stats || {
     totalInstallments: 0,
+    ownedInstallments: 0,
+    contributedInstallments: 0,
     totalInstallmentRequests: 0,
     totalProperties: 0,
     totalPropertyApplications: 0
   };
+  const ownedInstallments = stats.ownedInstallments ?? stats.totalInstallments;
+  const contributedInstallments = stats.contributedInstallments ?? 0;
 
   const recentInstallments = dashboardData?.recent?.recentInstallments || [];
   const recentProperties = dashboardData?.recent?.recentProperties || [];
@@ -112,9 +116,16 @@ const Dashboard = () => {
               <span className="text-xs font-semibold text-gray-500 uppercase">Total</span>
             </div>
             <h3 className="text-3xl font-bold text-gray-800 mb-1">{stats.totalInstallments}</h3>
-            <p className="text-sm text-gray-600">Installment Plans</p>
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <p className="text-xs text-gray-500">Plans you've created</p>
+            <p className="text-sm text-gray-600">Installment Products</p>
+            <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
+              <p className="text-xs text-gray-600">
+                <span className="font-semibold text-blue-700">{ownedInstallments}</span> your listings
+              </p>
+              {contributedInstallments > 0 && (
+                <p className="text-xs text-gray-600">
+                  <span className="font-semibold text-amber-700">{contributedInstallments}</span> shared (your plans on others&apos; products)
+                </p>
+              )}
             </div>
           </div>
 
@@ -177,13 +188,38 @@ const Dashboard = () => {
             <div className="p-6">
               {recentInstallments.length > 0 ? (
                 <div className="space-y-4">
-                  {recentInstallments.map((installment, index) => (
-                    <div key={index} className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-semibold text-gray-800">{installment.title || installment.planName || 'Installment Plan'}</h4>
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
-                          Active
-                        </span>
+                  {recentInstallments.map((installment, index) => {
+                    const isContributor = installment.partnerRole === 'contributor' || installment.isProductOwner === false;
+                    const listId = installment.installmentPlanId || installment._id;
+                    return (
+                    <div
+                      key={listId || index}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => listId && navigate(`/installments/${listId}`)}
+                      onKeyDown={(e) => e.key === 'Enter' && listId && navigate(`/installments/${listId}`)}
+                      className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between mb-2 gap-2">
+                        <h4 className="font-semibold text-gray-800">
+                          {installment.productName || installment.title || installment.planName || 'Installment'}
+                        </h4>
+                        <div className="flex flex-col items-end gap-1">
+                          {isContributor ? (
+                            <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
+                              Shared
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                              Your listing
+                            </span>
+                          )}
+                          {(installment.myPlanCount > 0 || installment.otherPlanCount > 0) && (
+                            <span className="text-[10px] text-gray-500">
+                              {installment.myPlanCount ?? 0} yours · {installment.otherPlanCount ?? 0} others
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         {installment.totalAmount && (
@@ -208,7 +244,8 @@ const Dashboard = () => {
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">

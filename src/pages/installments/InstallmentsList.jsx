@@ -54,8 +54,13 @@ const InstallmentsList = () => {
     fetchInstallments();
   }, [navigate, fetchInstallments]);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this installment plan?')) {
+  const handleDelete = async (installment) => {
+    if (installment.isProductOwner === false || installment.partnerRole === 'contributor') {
+      setError('You cannot delete the whole product. Open Edit to remove only your payment plans.');
+      return;
+    }
+    const id = installment._id || installment.installmentPlanId;
+    if (!window.confirm('Are you sure you want to delete this entire installment listing?')) {
       return;
     }
 
@@ -74,7 +79,10 @@ const InstallmentsList = () => {
 
       if (data.success) {
         // Remove deleted item from list or refresh
-        setInstallments(prev => prev.filter(item => item._id !== id && item.installmentPlanId !== id));
+        setInstallments(prev => prev.filter(item => {
+          const itemId = item.installmentPlanId || item._id;
+          return itemId !== id && item._id !== id;
+        }));
         setError(''); // Clear any previous errors
       } else {
         setError(data.message || 'Failed to delete installment plan');
@@ -177,12 +185,16 @@ const InstallmentsList = () => {
             {/* Installments Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {installments.map((installment) => {
-                const firstPlan = installment.paymentPlans?.[0] || {};
+                const isOwner = installment.isProductOwner !== false && installment.partnerRole !== 'contributor';
+                const myCount = installment.myPlanCount ?? 0;
+                const otherCount = installment.otherPlanCount ?? 0;
+                const preview = installment.myPlansPreview?.[0];
                 const mainImage = installment.productImages?.[0] || '';
+                const listId = installment.installmentPlanId || installment._id;
 
                 return (
                   <div
-                    key={installment._id}
+                    key={listId}
                     className="glass-red rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
                   >
                     {/* Product Image */}
@@ -208,16 +220,29 @@ const InstallmentsList = () => {
                             </span>
                           )}
                         </div>
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ml-2 ${
-                          installment.status === 'active' || installment.status === 'approved'
-                            ? 'bg-green-100 text-green-700'
-                            : installment.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {installment.status || 'Active'}
-                        </span>
+                        <div className="flex flex-col items-end gap-1 ml-2">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
+                            isOwner ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {isOwner ? 'Your listing' : 'Shared — your plans'}
+                          </span>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
+                            installment.status === 'active' || installment.status === 'approved'
+                              ? 'bg-green-100 text-green-700'
+                              : installment.status === 'pending'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {installment.status || 'Active'}
+                          </span>
+                        </div>
                       </div>
+
+                      {!isOwner && installment.ownerCompanyName && (
+                        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1 mb-3">
+                          Listed by: {installment.ownerCompanyName}
+                        </p>
+                      )}
 
                       {installment.description && (
                         <p className="text-sm text-gray-600 mb-4 line-clamp-2">
@@ -226,32 +251,31 @@ const InstallmentsList = () => {
                       )}
 
                       <div className="space-y-3">
-                        {installment.price && (
+                        {installment.price > 0 && (
                           <div className="flex items-center gap-2 text-sm">
                             <DollarSign className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">Price:</span>
+                            <span className="text-gray-600">Product price:</span>
                             <span className="font-semibold text-gray-800">
-                              ₨ {installment.price.toLocaleString()}
+                              ₨ {Number(installment.price).toLocaleString()}
                             </span>
                           </div>
                         )}
 
-                        {firstPlan.monthlyInstallment && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <FileText className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-600">Your plans:</span>
+                          <span className="font-semibold text-blue-700">{myCount}</span>
+                          {otherCount > 0 && (
+                            <span className="text-gray-500">· Others: {otherCount}</span>
+                          )}
+                        </div>
+
+                        {preview?.monthlyInstallment > 0 && (
                           <div className="flex items-center gap-2 text-sm">
                             <Calendar className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">Monthly:</span>
+                            <span className="text-gray-600">{preview.planName || 'Your plan'}:</span>
                             <span className="font-semibold text-gray-800">
-                              ₨ {firstPlan.monthlyInstallment.toLocaleString()}
-                            </span>
-                          </div>
-                        )}
-
-                        {firstPlan.tenureMonths && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <TrendingUp className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">Tenure:</span>
-                            <span className="font-semibold text-gray-800">
-                              {firstPlan.tenureMonths} months
+                              ₨ {Number(preview.monthlyInstallment).toLocaleString()}/mo
                             </span>
                           </div>
                         )}
@@ -266,10 +290,10 @@ const InstallmentsList = () => {
                           </div>
                         )}
 
-                        {installment.paymentPlans && installment.paymentPlans.length > 1 && (
+                        {myCount > 1 && (
                           <div className="pt-2">
                             <span className="text-xs text-blue-600 font-medium">
-                              +{installment.paymentPlans.length - 1} more plan{installment.paymentPlans.length > 2 ? 's' : ''}
+                              +{myCount - 1} more of your plan{myCount > 2 ? 's' : ''}
                             </span>
                           </div>
                         )}
@@ -283,9 +307,9 @@ const InstallmentsList = () => {
                         )}
                       </div>
 
-                      <div className="mt-4 grid grid-cols-3 gap-2">
+                      <div className={`mt-4 grid gap-2 ${isOwner ? 'grid-cols-3' : 'grid-cols-2'}`}>
                         <button
-                          onClick={() => navigate(`/installments/view/${installment._id}`)}
+                          onClick={() => navigate(`/installments/view/${encodeURIComponent(listId)}`)}
                           className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                           title="View Details"
                         >
@@ -293,25 +317,27 @@ const InstallmentsList = () => {
                         </button>
                         
                         <button
-                          onClick={() => navigate(`/installments/edit/${installment._id}`)}
+                          onClick={() => navigate(`/installments/edit/${encodeURIComponent(listId)}`)}
                           className="flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                          title="Edit Plan"
+                          title={isOwner ? 'Edit listing' : 'Manage your plans'}
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         
+                        {isOwner && (
                         <button
-                          onClick={() => handleDelete(installment._id)}
-                          disabled={deleteLoading === installment._id}
+                          onClick={() => handleDelete(installment)}
+                          disabled={deleteLoading === listId}
                           className="flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Delete Plan"
+                          title="Delete entire listing"
                         >
-                          {deleteLoading === installment._id ? (
+                          {deleteLoading === listId ? (
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                           ) : (
                             <Trash2 className="w-4 h-4" />
                           )}
                         </button>
+                        )}
                       </div>
                     </div>
                   </div>

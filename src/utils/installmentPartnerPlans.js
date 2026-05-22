@@ -1,4 +1,5 @@
 import { CATEGORY_SPECIFICATIONS } from '../constants/productCategories';
+import baseApi from '../constants/apiUrl';
 
 export const DEFAULT_INSTALLMENT_PLAN = {
   planName: "",
@@ -31,6 +32,68 @@ export const deriveProductPrice = (variants, fallback = 0) => {
 
 export const getProductOwnerUserId = (product) =>
   product?.createdBy?.[0]?.userId || product?.userId || product?.user || "";
+
+export const isProductOwnerForPartner = (product, partnerId) => {
+  const ownerId = getProductOwnerUserId(product);
+  if (partnerId && ownerId && String(ownerId) === String(partnerId)) return true;
+  const createdBy = product?.createdBy;
+  if (Array.isArray(createdBy)) {
+    return createdBy.some(
+      (c) => c?.userId && String(c.userId) === String(partnerId)
+    );
+  }
+  return Boolean(product?.isProductOwner);
+};
+
+export const flattenAllPlansWithMeta = (product) => {
+  const root = (product?.paymentPlans || []).map((p, planIndex) => ({
+    plan: p,
+    variantIndex: null,
+    variantName: null,
+    planIndex,
+    location: "root",
+  }));
+  const fromVariants = (product?.variants || []).flatMap((v, variantIndex) =>
+    (v.paymentPlans || []).map((p, planIndex) => ({
+      plan: p,
+      variantIndex,
+      variantName: v.variantName,
+      planIndex,
+      location: `variant-${variantIndex}`,
+    }))
+  );
+  return [...root, ...fromVariants];
+};
+
+export const getOtherPartnersPlans = (product, partnerId) => {
+  const owner = isProductOwnerForPartner(product, partnerId);
+  return flattenAllPlansWithMeta(product).filter(({ plan }) => {
+    if (plan?.partnerId && String(plan.partnerId) === String(partnerId)) {
+      return false;
+    }
+    if (!plan?.partnerId && owner) return false;
+    return true;
+  });
+};
+
+export const deletePartnerPaymentPlanApi = async (productId, planMongoId) => {
+  const token = localStorage.getItem("userToken");
+  const res = await fetch(
+    `${baseApi}/installment/${encodeURIComponent(productId)}/payment-plan/${encodeURIComponent(planMongoId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    }
+  );
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || "Failed to delete payment plan");
+  }
+  return data;
+};
 
 export const collectPartnerPlans = (product, partnerId) => {
   if (!product || !partnerId) return [];

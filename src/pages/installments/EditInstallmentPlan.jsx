@@ -18,7 +18,10 @@ import {
   deriveProductPrice,
   mapInstallmentPlanToForm,
   submitInstallmentPlanUpdate,
+  getOtherPartnersPlans,
+  deletePartnerPaymentPlanApi,
 } from '../../utils/installmentPartnerPlans';
+import OtherPartnersPlansSection from '../../components/installment/OtherPartnersPlansSection';
 import {
   PartnerStep4Tabs,
   ProductFinancePanel,
@@ -39,6 +42,7 @@ const EditInstallmentPlan = () => {
   const [error, setError] = useState(null);
   const [localImages, setLocalImages] = useState([]);
   const [isAttachedProduct, setIsAttachedProduct] = useState(false);
+  const [fullProduct, setFullProduct] = useState(null);
   const [step4Tab, setStep4Tab] = useState('installments');
 
   const [form, setForm] = useState({
@@ -106,6 +110,7 @@ const EditInstallmentPlan = () => {
         if (data.success) {
           const plan = data.data;
           if (plan) {
+            setFullProduct(plan);
             const mapped = mapInstallmentPlanToForm(plan, partnerUserId);
             const { _meta, ...formData } = mapped;
             setIsAttachedProduct(_meta.attached);
@@ -335,6 +340,8 @@ const EditInstallmentPlan = () => {
 
   const showVariantSection = Boolean(form.category);
   const fieldsLocked = isAttachedProduct;
+  const otherPartnersPlanEntries =
+    fullProduct && form.userId ? getOtherPartnersPlans(fullProduct, form.userId) : [];
 
   const isStepValid = () => {
     if (step === 1) return form.productName && form.city && form.category;
@@ -789,10 +796,13 @@ const EditInstallmentPlan = () => {
                 <InputField label={fieldsLocked ? "Your Cash Price (₨)" : "Cash Price (₨) *"} type="number" value={form.price} onChange={v => updateForm('price', v)} placeholder="Cash price for installment calculations" />
               )}
 
+              <OtherPartnersPlansSection entries={otherPartnersPlanEntries} />
+
               <div className="space-y-6">
+                <p className="text-sm font-semibold text-gray-700">Your payment plans</p>
                 {form.paymentPlans.map((p, idx) => (
                   <PaymentPlanCard
-                    key={idx}
+                    key={p._id || idx}
                     plan={p}
                     index={idx}
                     form={form}
@@ -800,6 +810,7 @@ const EditInstallmentPlan = () => {
                     recalcPlan={recalcPlan}
                     canRemove={form.paymentPlans.length > 1}
                     fieldsLocked={fieldsLocked}
+                    productId={id}
                   />
                 ))}
                 <AddPlanButton
@@ -878,12 +889,37 @@ const InputField = ({ label, value, onChange, type = "text", placeholder = "", r
 );
 
 // Payment Plan Card Component
-const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove, fieldsLocked }) => {
+const PaymentPlanCard = ({
+  plan,
+  index,
+  form,
+  setForm,
+  recalcPlan,
+  canRemove,
+  fieldsLocked,
+  productId,
+}) => {
   const updatePlan = (field, value) => {
     const pp = [...form.paymentPlans];
     pp[index][field] = value;
     setForm(f => ({ ...f, paymentPlans: pp }));
     setTimeout(() => recalcPlan(index), 0);
+  };
+
+  const handleRemove = async () => {
+    if (!window.confirm('Remove this payment plan?')) return;
+    if (plan._id && productId) {
+      try {
+        await deletePartnerPaymentPlanApi(productId, plan._id);
+      } catch (e) {
+        alert(e.message || 'Failed to delete plan');
+        return;
+      }
+    }
+    setForm((f) => ({
+      ...f,
+      paymentPlans: f.paymentPlans.filter((_, i) => i !== index),
+    }));
   };
 
   const planCashPrice =
@@ -896,8 +932,9 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove, fi
       {canRemove && (
         <button
           type="button"
-          onClick={() => setForm(f => ({ ...f, paymentPlans: f.paymentPlans.filter((_, i) => i !== index) }))}
+          onClick={handleRemove}
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          title="Delete this payment plan only"
         >
           <X className="w-5 h-5" />
         </button>

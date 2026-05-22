@@ -20,7 +20,12 @@ import {
   AddPlanButton,
   planPayloadWithFinance,
 } from '../../components/installment/InstallmentFinanceUI';
-import { DEFAULT_INSTALLMENT_PLAN } from '../../utils/installmentPartnerPlans';
+import {
+  DEFAULT_INSTALLMENT_PLAN,
+  getOtherPartnersPlans,
+  deletePartnerPaymentPlanApi,
+} from '../../utils/installmentPartnerPlans';
+import OtherPartnersPlansSection from '../../components/installment/OtherPartnersPlansSection';
 
 const getVariantEffectivePrice = (variant) => {
     if (!variant) return 0;
@@ -99,6 +104,7 @@ const CreateInstallmentPlan = () => {
     const [existingProducts, setExistingProducts] = useState([]);
     const [selectedProductId, setSelectedProductId] = useState('');
     const [existingPlans, setExistingPlans] = useState([]);
+    const [otherPartnersPlanEntries, setOtherPartnersPlanEntries] = useState([]);
     const [step4Tab, setStep4Tab] = useState('installments');
 
     const [form, setForm] = useState({
@@ -168,6 +174,7 @@ const CreateInstallmentPlan = () => {
         
         if (!productId) {
             setExistingPlans([]);
+            setOtherPartnersPlanEntries([]);
             setForm(prev => ({
                 ...prev,
                 productName: "",
@@ -194,6 +201,7 @@ const CreateInstallmentPlan = () => {
         if (product) {
             setForm(prev => {
             setExistingPlans(collectPartnerPlans(product, prev.userId));
+            setOtherPartnersPlanEntries(getOtherPartnersPlans(product, prev.userId));
             return {
                 ...prev,
                 productName: product.productName || "",
@@ -1004,12 +1012,14 @@ const CreateInstallmentPlan = () => {
                                 <InputField label={selectedProductId ? "Your Cash Price (₨)" : "Cash Price (₨) *"} type="number" value={form.price} onChange={v => updateForm('price', v)} placeholder="Cash price for installment calculations" />
                             )}
 
-                            {selectedProductId && existingPlans.length === 0 && (
-                                <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">No payment plans from your company on this product yet. Other vendors&apos; plans are hidden.</p>
+                            {selectedProductId && existingPlans.length === 0 && otherPartnersPlanEntries.length === 0 && (
+                                <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">No payment plans on this product yet. Add your first plan below.</p>
                             )}
 
+                            <OtherPartnersPlansSection entries={otherPartnersPlanEntries} />
+
                             <div className="space-y-6">
-                                {/* Render Existing Plans (Read-Only) */}
+                                {/* Render Existing Plans (Read-Only) — your company */}
                                 {existingPlans.map((p, idx) => (
                                     <div key={`ext-${idx}`} className="bg-gray-100/50 p-8 rounded-[2.5rem] border border-gray-200 relative group animate-in slide-in-from-right-4 duration-300 opacity-80">
                                         <div className="absolute top-4 right-6 bg-gray-200 text-gray-500 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">Existing Plan (Read-Only)</div>
@@ -1041,7 +1051,7 @@ const CreateInstallmentPlan = () => {
                                 {/* Render New Plans */}
                                 {form.paymentPlans.map((p, idx) => (
                                     <PaymentPlanCard
-                                        key={idx}
+                                        key={p._id || idx}
                                         plan={p}
                                         index={idx}
                                         form={form}
@@ -1049,6 +1059,7 @@ const CreateInstallmentPlan = () => {
                                         recalcPlan={recalcPlan}
                                         canRemove={form.paymentPlans.length > 1}
                                         selectedProductId={selectedProductId}
+                                        productIdForDelete={selectedProductId}
                                     />
                                 ))}
 
@@ -1128,7 +1139,17 @@ const InputField = ({ label, value, onChange, type = "text", placeholder = "", r
 );
 
 // Payment Plan Card Component
-const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove, selectedProductId }) => {
+const PaymentPlanCard = ({
+    plan,
+    index,
+    form,
+    setForm,
+    recalcPlan,
+    canRemove,
+    selectedProductId,
+    productIdForDelete,
+    onPlanRemoved,
+}) => {
     const updatePlan = (field, value) => {
         const pp = [...form.paymentPlans];
         pp[index][field] = value;
@@ -1136,13 +1157,32 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove, se
         setTimeout(() => recalcPlan(index), 0);
     };
 
+    const handleRemove = async () => {
+        if (!window.confirm('Remove this payment plan?')) return;
+        const deleteId = productIdForDelete || selectedProductId;
+        if (plan._id && deleteId) {
+            try {
+                await deletePartnerPaymentPlanApi(deleteId, plan._id);
+            } catch (e) {
+                alert(e.message || 'Failed to delete plan');
+                return;
+            }
+        }
+        setForm((f) => ({
+            ...f,
+            paymentPlans: f.paymentPlans.filter((_, i) => i !== index),
+        }));
+        onPlanRemoved?.();
+    };
+
     return (
         <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-200 relative">
             {canRemove && (
                 <button
                     type="button"
-                    onClick={() => setForm(f => ({ ...f, paymentPlans: f.paymentPlans.filter((_, i) => i !== index) }))}
+                    onClick={handleRemove}
                     className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete this payment plan"
                 >
                     <X className="w-5 h-5" />
                 </button>

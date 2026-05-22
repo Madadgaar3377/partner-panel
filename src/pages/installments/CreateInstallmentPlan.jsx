@@ -13,6 +13,14 @@ import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 import SearchableProductSelect from '../../components/SearchableProductSelect';
+import {
+  PartnerStep4Tabs,
+  ProductFinancePanel,
+  PlanFinanceSection,
+  AddPlanButton,
+  planPayloadWithFinance,
+} from '../../components/installment/InstallmentFinanceUI';
+import { DEFAULT_INSTALLMENT_PLAN } from '../../utils/installmentPartnerPlans';
 
 const getVariantEffectivePrice = (variant) => {
     if (!variant) return 0;
@@ -76,17 +84,7 @@ const buildPartnerVariantPricing = (variants) =>
         }))
         .filter((v) => v.cashPrice > 0);
 
-const defaultPlan = {
-    planName: "",
-    installmentPrice: 0,
-    downPayment: 0,
-    monthlyInstallment: 0,
-    tenureMonths: 12,
-    interestRatePercent: 0,
-    interestType: "Flat Rate",
-    markup: 0,
-    otherChargesNote: "",
-};
+const defaultPlan = { ...DEFAULT_INSTALLMENT_PLAN };
 
 const CreateInstallmentPlan = () => {
     const navigate = useNavigate();
@@ -101,6 +99,7 @@ const CreateInstallmentPlan = () => {
     const [existingProducts, setExistingProducts] = useState([]);
     const [selectedProductId, setSelectedProductId] = useState('');
     const [existingPlans, setExistingPlans] = useState([]);
+    const [step4Tab, setStep4Tab] = useState('installments');
 
     const [form, setForm] = useState({
         userId: "",
@@ -129,7 +128,8 @@ const CreateInstallmentPlan = () => {
             subCategory: "",
             specifications: []
         },
-        variants: [], // New: Product Variants
+        variants: [],
+        finance: { bankName: "", financeInfo: "" },
     });
 
     // Load userId from localStorage on component mount
@@ -402,7 +402,7 @@ const CreateInstallmentPlan = () => {
                 for (const plan of form.paymentPlans) {
                     const variantIdx = resolvePlanVariantIndex(plan, form.variants);
                     const planData = {
-                        ...plan,
+                        ...planPayloadWithFinance(plan),
                         variantIndex: variantIdx,
                         cashPrice: cashPriceForPlan(plan),
                         partnerBasePrice,
@@ -459,7 +459,7 @@ const CreateInstallmentPlan = () => {
                         paymentPlans: form.paymentPlans
                             .filter(p => p.variantIndex === vIdx)
                             .map(p => ({
-                                ...p,
+                                ...planPayloadWithFinance(p),
                                 cashPrice: getVariantEffectivePrice(v),
                                 installmentPrice: Number(p.installmentPrice),
                                 downPayment: Number(p.downPayment),
@@ -469,12 +469,13 @@ const CreateInstallmentPlan = () => {
                     paymentPlans: form.paymentPlans
                         .filter(p => p.variantIndex === null || p.variantIndex === undefined || p.variantIndex === -1)
                         .map(p => ({
-                            ...p,
+                            ...planPayloadWithFinance(p),
                             cashPrice: productPrice,
                             installmentPrice: Number(p.installmentPrice),
                             downPayment: Number(p.downPayment),
                             monthlyInstallment: Number(p.monthlyInstallment)
                         })),
+                    finance: form.finance || {},
                 }),
             });
             const data = await res.json();
@@ -923,27 +924,29 @@ const CreateInstallmentPlan = () => {
                     {/* Step 4: Payment Plans */}
                     {step === 4 && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap items-center justify-between gap-4">
                                 <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-red-600 pl-4">
                                     Variants & Payment Plans
                                 </h2>
-                                <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                        <p className="text-xs text-gray-500">Reference cash price</p>
-                                        <p className="text-xl font-bold text-red-600">
-                                            ₨ {deriveProductPrice(form.variants, form.price).toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setForm(f => ({ ...f, paymentPlans: [...f.paymentPlans, { ...defaultPlan }] }))}
-                                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                                    >
-                                        + Add Plan
-                                    </button>
+                                <div className="text-right">
+                                    <p className="text-xs text-gray-500">Reference cash price</p>
+                                    <p className="text-xl font-bold text-red-600">
+                                        ₨ {deriveProductPrice(form.variants, form.price).toLocaleString()}
+                                    </p>
                                 </div>
                             </div>
 
+                            <PartnerStep4Tabs active={step4Tab} onChange={setStep4Tab} />
+
+                            {(step4Tab === 'finance' || step4Tab === 'both') && (
+                                <ProductFinancePanel
+                                    finance={form.finance}
+                                    onUpdate={(field, value) => updateForm(`finance.${field}`, value)}
+                                />
+                            )}
+
+                            {(step4Tab === 'installments' || step4Tab === 'both') && (
+                            <>
                             {showVariantSection && (
                                 <div className="space-y-4 p-6 bg-blue-50 border border-blue-200 rounded-xl">
                                     <div className="flex items-center justify-between">
@@ -1048,7 +1051,19 @@ const CreateInstallmentPlan = () => {
                                         selectedProductId={selectedProductId}
                                     />
                                 ))}
+
+                                <AddPlanButton
+                                    onClick={() =>
+                                        setForm((f) => ({
+                                            ...f,
+                                            paymentPlans: [...f.paymentPlans, { ...defaultPlan }],
+                                        }))
+                                    }
+                                    className="mt-2"
+                                />
                             </div>
+                            </>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1223,6 +1238,8 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove, se
                     </>
                 )}
             </div>
+
+            <PlanFinanceSection plan={plan} index={index} setForm={setForm} />
 
             {/* Summary */}
             <div className="bg-white rounded-xl p-4 border-2 border-red-100">

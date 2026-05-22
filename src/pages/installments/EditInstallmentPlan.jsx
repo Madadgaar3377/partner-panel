@@ -19,6 +19,12 @@ import {
   mapInstallmentPlanToForm,
   submitInstallmentPlanUpdate,
 } from '../../utils/installmentPartnerPlans';
+import {
+  PartnerStep4Tabs,
+  ProductFinancePanel,
+  PlanFinanceSection,
+  AddPlanButton,
+} from '../../components/installment/InstallmentFinanceUI';
 
 const defaultPlan = DEFAULT_INSTALLMENT_PLAN;
 
@@ -33,6 +39,7 @@ const EditInstallmentPlan = () => {
   const [error, setError] = useState(null);
   const [localImages, setLocalImages] = useState([]);
   const [isAttachedProduct, setIsAttachedProduct] = useState(false);
+  const [step4Tab, setStep4Tab] = useState('installments');
 
   const [form, setForm] = useState({
     userId: "",
@@ -702,27 +709,29 @@ const EditInstallmentPlan = () => {
           {/* Step 4: Payment Plans */}
           {step === 4 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-red-600 pl-4">
                   Variants & Payment Plans
                 </h2>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">Reference cash price</p>
-                    <p className="text-xl font-bold text-red-600">
-                      ₨ {deriveProductPrice(form.variants, form.price).toLocaleString()}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, paymentPlans: [...f.paymentPlans, { ...defaultPlan }] }))}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                  >
-                    + Add Plan
-                  </button>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">Reference cash price</p>
+                  <p className="text-xl font-bold text-red-600">
+                    ₨ {deriveProductPrice(form.variants, form.price).toLocaleString()}
+                  </p>
                 </div>
               </div>
 
+              <PartnerStep4Tabs active={step4Tab} onChange={setStep4Tab} />
+
+              {(step4Tab === 'finance' || step4Tab === 'both') && (
+                <ProductFinancePanel
+                  finance={form.finance}
+                  onUpdate={(field, value) => updateForm(`finance.${field}`, value)}
+                />
+              )}
+
+              {(step4Tab === 'installments' || step4Tab === 'both') && (
+              <>
               {showVariantSection && (
                 <div className="space-y-4 p-6 bg-blue-50 border border-blue-200 rounded-xl">
                   <div className="flex items-center justify-between">
@@ -793,7 +802,18 @@ const EditInstallmentPlan = () => {
                     fieldsLocked={fieldsLocked}
                   />
                 ))}
+                <AddPlanButton
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      paymentPlans: [...f.paymentPlans, { ...defaultPlan }],
+                    }))
+                  }
+                  className="mt-2"
+                />
               </div>
+              </>
+              )}
             </div>
           )}
         </div>
@@ -973,6 +993,8 @@ const PaymentPlanCard = ({ plan, index, form, setForm, recalcPlan, canRemove, fi
           </>
         )}
       </div>
+
+      <PlanFinanceSection plan={plan} index={index} setForm={setForm} />
 
       {/* Summary */}
       <div className="bg-white rounded-xl p-4 border-2 border-red-100">

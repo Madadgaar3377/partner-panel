@@ -10,6 +10,8 @@ export const DEFAULT_INSTALLMENT_PLAN = {
   interestType: "Flat Rate",
   markup: 0,
   otherChargesNote: "",
+  finance: { bankName: "", financeInfo: "" },
+  hasFinance: false,
 };
 
 export const getVariantEffectivePrice = (variant) => {
@@ -123,13 +125,17 @@ export const flattenEditorPaymentPlans = (product, editorUserId, productOwnerUse
 };
 
 export const normalizePlansForForm = (plans, variants) =>
-  (plans || []).map((p) => ({
-    ...DEFAULT_INSTALLMENT_PLAN,
-    ...p,
-    variantIndex: remapPlanVariantIndexForEditor(p, variants),
-    finance: p.finance || { bankName: "", financeInfo: "" },
-    otherChargesNote: p.otherChargesNote || "",
-  }));
+  (plans || []).map((p) => {
+    const finance = p.finance || { bankName: "", financeInfo: "" };
+    return {
+      ...DEFAULT_INSTALLMENT_PLAN,
+      ...p,
+      variantIndex: remapPlanVariantIndexForEditor(p, variants),
+      finance,
+      hasFinance: !!(finance.bankName || finance.financeInfo),
+      otherChargesNote: p.otherChargesNote || "",
+    };
+  });
 
 export const mapProductVariantsForPartner = (product, partnerId) => {
   const partnerEntry = (product?.partnerPricing || []).find(
@@ -268,7 +274,7 @@ export const getPartnerProfileFromStorage = () => {
 };
 
 const stripPlanForApi = (plan) => {
-  const { _id, __v, createdAt, updatedAt, ...rest } = plan;
+  const { _id, __v, createdAt, updatedAt, hasFinance, ...rest } = plan;
   return rest;
 };
 
@@ -287,7 +293,10 @@ export const mapPlanForApi = (plan, form, cashPriceOverride) => {
     tenureMonths: Number(plan.tenureMonths) || 0,
     interestRatePercent: Number(plan.interestRatePercent) || 0,
     markup: Number(plan.markup) || 0,
-    finance: plan.finance || { bankName: "", financeInfo: "" },
+    finance:
+      plan.hasFinance && (plan.finance?.bankName || plan.finance?.financeInfo)
+        ? plan.finance
+        : { bankName: "", financeInfo: "" },
   };
   if (plan._id) mapped._id = plan._id;
   return mapped;

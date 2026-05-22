@@ -18,10 +18,8 @@ import {
   deriveProductPrice,
   mapInstallmentPlanToForm,
   submitInstallmentPlanUpdate,
-  getOtherPartnersPlans,
   deletePartnerPaymentPlanApi,
 } from '../../utils/installmentPartnerPlans';
-import OtherPartnersPlansSection from '../../components/installment/OtherPartnersPlansSection';
 import {
   PartnerStep4Tabs,
   ProductFinancePanel,
@@ -42,7 +40,6 @@ const EditInstallmentPlan = () => {
   const [error, setError] = useState(null);
   const [localImages, setLocalImages] = useState([]);
   const [isAttachedProduct, setIsAttachedProduct] = useState(false);
-  const [fullProduct, setFullProduct] = useState(null);
   const [step4Tab, setStep4Tab] = useState('installments');
 
   const [form, setForm] = useState({
@@ -97,7 +94,7 @@ const EditInstallmentPlan = () => {
         const token = localStorage.getItem('userToken');
         const partnerUserId = JSON.parse(localStorage.getItem('userData') || '{}')?.userId;
 
-        const response = await fetch(`${baseApi}/getInstallment/${encodeURIComponent(id)}`, {
+        const response = await fetch(`${baseApi}/getPartnerInstallment/${encodeURIComponent(id)}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -110,7 +107,6 @@ const EditInstallmentPlan = () => {
         if (data.success) {
           const plan = data.data;
           if (plan) {
-            setFullProduct(plan);
             const mapped = mapInstallmentPlanToForm(plan, partnerUserId);
             const { _meta, ...formData } = mapped;
             setIsAttachedProduct(_meta.attached);
@@ -340,9 +336,6 @@ const EditInstallmentPlan = () => {
 
   const showVariantSection = Boolean(form.category);
   const fieldsLocked = isAttachedProduct;
-  const otherPartnersPlanEntries =
-    fullProduct && form.userId ? getOtherPartnersPlans(fullProduct, form.userId) : [];
-
   const isStepValid = () => {
     if (step === 1) return form.productName && form.city && form.category;
     if (step === 3 && !fieldsLocked) return form.productImages.length > 0;
@@ -403,7 +396,7 @@ const EditInstallmentPlan = () => {
           <p className="text-gray-600 mt-1">Update your installment plan details</p>
           {isAttachedProduct && (
             <p className="mt-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
-              Shared catalog product: edit <strong>only your company&apos;s payment plans</strong>. Other vendors&apos; plans stay on the listing unchanged.
+              Shared catalog product: you only see and edit <strong>your company&apos;s payment plans</strong> on this listing.
             </p>
           )}
         </div>
@@ -796,10 +789,7 @@ const EditInstallmentPlan = () => {
                 <InputField label={fieldsLocked ? "Your Cash Price (₨)" : "Cash Price (₨) *"} type="number" value={form.price} onChange={v => updateForm('price', v)} placeholder="Cash price for installment calculations" />
               )}
 
-              <OtherPartnersPlansSection entries={otherPartnersPlanEntries} />
-
               <div className="space-y-6">
-                <p className="text-sm font-semibold text-gray-700">Your payment plans</p>
                 {form.paymentPlans.map((p, idx) => (
                   <PaymentPlanCard
                     key={p._id || idx}

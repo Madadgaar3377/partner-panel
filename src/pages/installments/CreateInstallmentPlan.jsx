@@ -22,10 +22,8 @@ import {
 } from '../../components/installment/InstallmentFinanceUI';
 import {
   DEFAULT_INSTALLMENT_PLAN,
-  getOtherPartnersPlans,
   deletePartnerPaymentPlanApi,
 } from '../../utils/installmentPartnerPlans';
-import OtherPartnersPlansSection from '../../components/installment/OtherPartnersPlansSection';
 
 const getVariantEffectivePrice = (variant) => {
     if (!variant) return 0;
@@ -104,7 +102,6 @@ const CreateInstallmentPlan = () => {
     const [existingProducts, setExistingProducts] = useState([]);
     const [selectedProductId, setSelectedProductId] = useState('');
     const [existingPlans, setExistingPlans] = useState([]);
-    const [otherPartnersPlanEntries, setOtherPartnersPlanEntries] = useState([]);
     const [step4Tab, setStep4Tab] = useState('installments');
 
     const [form, setForm] = useState({
@@ -174,7 +171,6 @@ const CreateInstallmentPlan = () => {
         
         if (!productId) {
             setExistingPlans([]);
-            setOtherPartnersPlanEntries([]);
             setForm(prev => ({
                 ...prev,
                 productName: "",
@@ -201,7 +197,6 @@ const CreateInstallmentPlan = () => {
         if (product) {
             setForm(prev => {
             setExistingPlans(collectPartnerPlans(product, prev.userId));
-            setOtherPartnersPlanEntries(getOtherPartnersPlans(product, prev.userId));
             return {
                 ...prev,
                 productName: product.productName || "",
@@ -1012,11 +1007,9 @@ const CreateInstallmentPlan = () => {
                                 <InputField label={selectedProductId ? "Your Cash Price (₨)" : "Cash Price (₨) *"} type="number" value={form.price} onChange={v => updateForm('price', v)} placeholder="Cash price for installment calculations" />
                             )}
 
-                            {selectedProductId && existingPlans.length === 0 && otherPartnersPlanEntries.length === 0 && (
-                                <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">No payment plans on this product yet. Add your first plan below.</p>
+                            {selectedProductId && existingPlans.length === 0 && (
+                                <p className="text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">No payment plans from your company on this product yet. Add your first plan below.</p>
                             )}
-
-                            <OtherPartnersPlansSection entries={otherPartnersPlanEntries} />
 
                             <div className="space-y-6">
                                 {/* Render Existing Plans (Read-Only) — your company */}

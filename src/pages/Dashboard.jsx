@@ -214,9 +214,9 @@ const Dashboard = () => {
                               Your listing
                             </span>
                           )}
-                          {(installment.myPlanCount > 0 || installment.otherPlanCount > 0) && (
+                          {installment.myPlanCount > 0 && (
                             <span className="text-[10px] text-gray-500">
-                              {installment.myPlanCount ?? 0} yours · {installment.otherPlanCount ?? 0} others
+                              {installment.myPlanCount} plan{installment.myPlanCount !== 1 ? 's' : ''}
                             </span>
                           )}
                         </div>

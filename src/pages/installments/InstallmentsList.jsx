@@ -187,7 +187,6 @@ const InstallmentsList = () => {
               {installments.map((installment) => {
                 const isOwner = installment.isProductOwner !== false && installment.partnerRole !== 'contributor';
                 const myCount = installment.myPlanCount ?? 0;
-                const otherCount = installment.otherPlanCount ?? 0;
                 const preview = installment.myPlansPreview?.[0];
                 const mainImage = installment.productImages?.[0] || '';
                 const listId = installment.installmentPlanId || installment._id;
@@ -265,9 +264,6 @@ const InstallmentsList = () => {
                           <FileText className="w-4 h-4 text-gray-400" />
                           <span className="text-gray-600">Your plans:</span>
                           <span className="font-semibold text-blue-700">{myCount}</span>
-                          {otherCount > 0 && (
-                            <span className="text-gray-500">· Others: {otherCount}</span>
-                          )}
                         </div>
 
                         {preview?.monthlyInstallment > 0 && (

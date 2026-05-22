@@ -21,8 +21,6 @@ import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { PRODUCT_CATEGORIES } from '../../constants/productCategories';
 import {
-  filterPlansForEditor,
-  getOtherPartnersPlans,
   flattenAllPlansWithMeta,
   isProductOwnerForPartner,
   getProductOwnerUserId,
@@ -47,7 +45,7 @@ const InstallmentDetail = () => {
 
       const partnerUserId = JSON.parse(localStorage.getItem('userData') || '{}')?.userId;
 
-      const response = await fetch(`${baseApi}/getInstallment/${encodeURIComponent(id)}`, {
+      const response = await fetch(`${baseApi}/getPartnerInstallment/${encodeURIComponent(id)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -130,8 +128,6 @@ const InstallmentDetail = () => {
       (plan?.partnerId && String(plan.partnerId) === String(partnerUserId)) ||
       (!plan?.partnerId && isOwner)
   );
-  const otherPlanEntries = getOtherPartnersPlans(installment, partnerUserId);
-
   const renderPlanCard = (entry, keyPrefix) => {
     const { plan, variantName } = entry;
     return (
@@ -335,19 +331,6 @@ const InstallmentDetail = () => {
                 </h2>
                 <div className="space-y-4">
                   {myPlanEntries.map((entry) => renderPlanCard(entry, 'mine'))}
-                </div>
-              </div>
-            )}
-
-            {otherPlanEntries.length > 0 && (
-              <div className="glass-red rounded-xl shadow-lg p-8 border border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
-                  <Package className="w-6 h-6 text-gray-500" />
-                  Other Companies&apos; Plans ({otherPlanEntries.length})
-                </h2>
-                <p className="text-sm text-gray-500 mb-4">Read-only — visible on the shared listing.</p>
-                <div className="space-y-4 opacity-90">
-                  {otherPlanEntries.map((entry) => renderPlanCard(entry, 'other'))}
                 </div>
               </div>
             )}

@@ -32,7 +32,8 @@ const InstallmentsList = () => {
       const data = await response.json();
 
       if (data.success) {
-        setInstallments(data.data || []);
+        const rows = (data.data || []).filter((item) => item.status !== 'deleted');
+        setInstallments(rows);
       } else {
         setError(data.message || 'Failed to fetch installments');
       }
@@ -60,14 +61,18 @@ const InstallmentsList = () => {
       return;
     }
     const id = installment._id || installment.installmentPlanId;
-    if (!window.confirm('Are you sure you want to delete this entire installment listing?')) {
+    if (
+      !window.confirm(
+        'Permanently delete this product listing?\n\nIt will be removed immediately from your panel and the public website. This cannot be undone.'
+      )
+    ) {
       return;
     }
 
     setDeleteLoading(id);
     try {
       const token = localStorage.getItem('userToken');
-      const response = await fetch(`${baseApi}/deleteInstallment/${id}`, {
+      const response = await fetch(`${baseApi}/deleteInstallment/${encodeURIComponent(id)}?permanent=true`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -78,12 +83,13 @@ const InstallmentsList = () => {
       const data = await response.json();
 
       if (data.success) {
-        // Remove deleted item from list or refresh
-        setInstallments(prev => prev.filter(item => {
-          const itemId = item.installmentPlanId || item._id;
-          return itemId !== id && item._id !== id;
-        }));
-        setError(''); // Clear any previous errors
+        setInstallments((prev) =>
+          prev.filter((item) => {
+            const itemId = item.installmentPlanId || item._id;
+            return itemId !== id && item._id !== id && item.status !== 'deleted';
+          })
+        );
+        setError('');
       } else {
         setError(data.message || 'Failed to delete installment plan');
       }

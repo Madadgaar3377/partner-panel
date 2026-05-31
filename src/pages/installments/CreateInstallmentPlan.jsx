@@ -550,9 +550,13 @@ const CreateInstallmentPlan = () => {
 
             const plansTargetOk = activePlans.every((p) => {
                 const vIdx = p.variantIndex;
-                const isStandard =
+                const missingVariant =
                     vIdx === null || vIdx === undefined || vIdx === "" || vIdx === -1 || vIdx === "-1";
-                if (isStandard) return productPrice > 0;
+                if (showVariantSection && form.variants.length > 0) {
+                    if (missingVariant) return false;
+                    return Number(form.variants[Number(vIdx)]?.price) > 0;
+                }
+                if (missingVariant) return productPrice > 0;
                 return Number(form.variants[Number(vIdx)]?.price) > 0;
             });
             return plansTargetOk;
@@ -1122,7 +1126,7 @@ const CreateInstallmentPlan = () => {
 
                                 {showVariantSection && form.variants.length > 0 && (
                                     <p className="text-sm text-gray-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                                        For each plan, choose <strong>Applies To Variant</strong> (e.g. Test). Plans on a variant use that variant&apos;s cash price and discount. Use <strong>Standard (product-level)</strong> only for a plan that applies to the whole listing, not a specific variant.
+                                        For each plan, choose <strong>Applies To Variant</strong> so pricing uses that variant&apos;s cash price and discount.
                                     </p>
                                 )}
 
@@ -1134,12 +1138,7 @@ const CreateInstallmentPlan = () => {
                                                 ...f.paymentPlans,
                                                 {
                                                     ...defaultPlan,
-                                                    variantIndex:
-                                                        f.variants.length === 1
-                                                            ? 0
-                                                            : f.variants.length > 1
-                                                              ? null
-                                                              : defaultPlan.variantIndex,
+                                                    variantIndex: f.variants.length > 0 ? 0 : null,
                                                 },
                                             ],
                                         }))
@@ -1278,16 +1277,21 @@ const PaymentPlanCard = ({
                 <div className="md:col-span-1 space-y-2">
                     <label className="block text-sm font-medium text-gray-700">Applies To Variant</label>
                     <select 
-                        value={plan.variantIndex ?? -1} 
+                        value={plan.variantIndex ?? ""} 
                         onChange={e => {
+                            const v = parseInt(e.target.value, 10);
+                            if (Number.isNaN(v)) return;
                             const pp = [...form.paymentPlans];
-                            pp[index].variantIndex = e.target.value === "-1" ? null : parseInt(e.target.value);
+                            pp[index].variantIndex = v;
                             setForm(f => ({ ...f, paymentPlans: pp }));
                             setTimeout(() => recalcPlan(index), 0);
                         }}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white text-sm"
+                        required
                     >
-                        <option value="-1">Standard (product-level plan)</option>
+                        {(plan.variantIndex === null || plan.variantIndex === undefined) && (
+                            <option value="" disabled>— Select variant —</option>
+                        )}
                         {form.variants.map((v, vIdx) => (
                             <option key={vIdx} value={vIdx}>{v.variantName} (₨ {getVariantEffectivePrice(v).toLocaleString()})</option>
                         ))}

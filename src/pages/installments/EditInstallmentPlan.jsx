@@ -349,16 +349,22 @@ const EditInstallmentPlan = () => {
         const planVariantIdxs = form.paymentPlans
           .map((p) => p.variantIndex)
           .filter((ix) => ix !== null && ix !== undefined && ix !== -1 && ix !== "");
-        if (form.variants.length > 0 && planVariantIdxs.length > 0) {
+        if (form.variants.length > 0) {
+          if (planVariantIdxs.length !== form.paymentPlans.length) return false;
           if (!planVariantIdxs.every((ix) => Number(form.variants[Number(ix)]?.price) > 0)) return false;
-        } else if (form.variants.length > 0) {
-          if (!form.variants.some((v) => Number(v.price) > 0)) return false;
         } else if (!Number(form.price)) {
           return false;
         }
       }
       if (!showVariantSection && !fieldsLocked && !Number(form.price)) return false;
       if (!showVariantSection && fieldsLocked && !Number(form.price)) return false;
+      if (showVariantSection && form.variants.length > 0) {
+        const everyPlanHasVariant = form.paymentPlans.every((p) => {
+          const ix = p.variantIndex;
+          return ix !== null && ix !== undefined && ix !== "" && ix !== -1 && ix !== "-1";
+        });
+        if (!everyPlanHasVariant) return false;
+      }
       return form.paymentPlans.every((p) => p.planName && Number(p.installmentPrice) > 0);
     }
     return true;
@@ -807,7 +813,13 @@ const EditInstallmentPlan = () => {
                   onClick={() =>
                     setForm((f) => ({
                       ...f,
-                      paymentPlans: [...f.paymentPlans, { ...defaultPlan }],
+                      paymentPlans: [
+                        ...f.paymentPlans,
+                        {
+                          ...defaultPlan,
+                          variantIndex: f.variants.length > 0 ? 0 : null,
+                        },
+                      ],
                     }))
                   }
                   className="mt-2"
@@ -935,16 +947,21 @@ const PaymentPlanCard = ({
         <div className="md:col-span-1 space-y-2">
           <label className="block text-sm font-medium text-gray-700">Applies To Variant</label>
           <select 
-            value={plan.variantIndex ?? -1} 
+            value={plan.variantIndex ?? ""} 
             onChange={e => {
+              const v = parseInt(e.target.value, 10);
+              if (Number.isNaN(v)) return;
               const pp = [...form.paymentPlans];
-              pp[index].variantIndex = e.target.value === "-1" ? null : parseInt(e.target.value);
+              pp[index].variantIndex = v;
               setForm(f => ({ ...f, paymentPlans: pp }));
               setTimeout(() => recalcPlan(index), 0);
             }}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white text-sm"
+            required
           >
-            <option value="-1">{fieldsLocked && form.variants.length > 0 ? "— Select variant —" : "Standard (no variant)"}</option>
+            {(plan.variantIndex === null || plan.variantIndex === undefined) && (
+              <option value="" disabled>— Select variant —</option>
+            )}
             {form.variants.map((v, vIdx) => (
               <option key={vIdx} value={vIdx}>{v.variantName} (₨ {getVariantEffectivePrice(v).toLocaleString()})</option>
             ))}

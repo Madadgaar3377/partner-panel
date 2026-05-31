@@ -190,10 +190,17 @@ export const flattenEditorPaymentPlans = (product, editorUserId, productOwnerUse
 export const normalizePlansForForm = (plans, variants) =>
   (plans || []).map((p) => {
     const finance = p.finance || { bankName: "", financeInfo: "" };
+    let variantIndex = remapPlanVariantIndexForEditor(p, variants);
+    if (
+      variants?.length > 0 &&
+      (variantIndex === null || variantIndex === undefined)
+    ) {
+      variantIndex = 0;
+    }
     return {
       ...DEFAULT_INSTALLMENT_PLAN,
       ...p,
-      variantIndex: remapPlanVariantIndexForEditor(p, variants),
+      variantIndex,
       finance,
       hasFinance: !!(finance.bankName || finance.financeInfo),
       otherChargesNote: p.otherChargesNote || "",

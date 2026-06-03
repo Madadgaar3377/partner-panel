@@ -212,18 +212,42 @@ export const mapProductVariantsForPartner = (product, partnerId) => {
     (p) => p?.partnerId && String(p.partnerId) === String(partnerId)
   );
   const overrides = partnerEntry?.variantOverrides || [];
-  return (product?.variants || []).map((v, i) => {
+  const rows = [];
+
+  (product?.variants || []).forEach((v, i) => {
+    const vPartnerId = v?.partnerId ? String(v.partnerId) : "";
+    if (vPartnerId && vPartnerId !== String(partnerId)) return;
+
+    if (vPartnerId === String(partnerId)) {
+      rows.push({
+        variantName: v.variantName || `Your variant ${rows.length + 1}`,
+        listingPrice: null,
+        price: v.price ?? "",
+        discountPercent: v.discountPercent ?? 0,
+        isCatalogVariant: false,
+        isPartnerOwned: true,
+        sourceVariantIndex: i,
+        dbVariantIndex: i,
+        status: v.status || "active",
+      });
+      return;
+    }
+
     const ov = overrides.find((o) => Number(o.variantIndex) === i);
-    return {
+    rows.push({
       variantName: v.variantName || `Variant ${i + 1}`,
       listingPrice: v.price,
       price: ov?.cashPrice ?? "",
       discountPercent: ov?.discountPercent ?? 0,
       isCatalogVariant: true,
+      isPartnerOwned: false,
       sourceVariantIndex: i,
+      dbVariantIndex: i,
       status: v.status || "active",
-    };
+    });
   });
+
+  return rows;
 };
 
 export const mapVariantsForOwnerEditor = (variants) =>
@@ -298,6 +322,9 @@ export const resolvePlanVariantIndex = (plan, variants) => {
     return null;
   }
   const variant = variants?.[Number(vIdx)];
+  if (variant?.dbVariantIndex != null && Number.isFinite(Number(variant.dbVariantIndex))) {
+    return Number(variant.dbVariantIndex);
+  }
   if (variant?.isCatalogVariant && variant.sourceVariantIndex != null) {
     return Number(variant.sourceVariantIndex);
   }
@@ -313,6 +340,56 @@ export const buildPartnerVariantPricing = (variants) =>
       discountPercent: Number(v.discountPercent) || 0,
     }))
     .filter((v) => v.cashPrice > 0);
+
+export const buildPartnerOwnedVariantsPayload = (variants) =>
+  (variants || [])
+    .filter((v) => v.isPartnerOwned && String(v.variantName || "").trim())
+    .map((v) => ({
+      variantName: String(v.variantName).trim(),
+      cashPrice: Number(v.price) || 0,
+      discountPercent: Number(v.discountPercent) || 0,
+      status: v.status || "active",
+    }));
+
+export const buildPartnerCatalogPricingPatch = (form, editorUserId) => {
+  const productPrice = deriveProductPrice(form.variants, form.price);
+  return {
+    userId: editorUserId,
+    mergePartnerPlans: true,
+    partnerBasePrice: Number(form.partnerBasePrice || form.price) || productPrice,
+    partnerVariantPricing: buildPartnerVariantPricing(form.variants),
+    partnerOwnedVariants: buildPartnerOwnedVariantsPayload(form.variants),
+  };
+};
+
+/** Save cash prices (and optional partner-only variants) on a shared catalog product — no payment plans required. */
+export const submitPartnerCatalogPricing = async ({
+  installmentId,
+  form,
+  editorUserId,
+  baseApi,
+  token,
+}) => {
+  const profile = getPartnerProfileFromStorage();
+  const uid = editorUserId || profile.userId;
+  const patch = buildPartnerCatalogPricingPatch(form, uid);
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const putRes = await fetch(`${baseApi}/updateInstallment/${installmentId}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(patch),
+  });
+  const putData = await putRes.json();
+  if (!putData.success) {
+    throw new Error(putData.message || putData.error || "Failed to save your pricing.");
+  }
+  return putData;
+};
 
 export const cashPriceForPlan = (plan, form) => {
   const vIdx = plan.variantIndex;
@@ -442,7 +519,11 @@ export const buildInstallmentUpdateBody = ({
     return Number(raw) === vIdx;
   };
 
-  const variantsPayload = (form.variants || []).map((v, vIdx) => {
+  const catalogVariantsForPayload = (form.variants || [])
+    .map((v, vIdx) => ({ v, vIdx }))
+    .filter(({ v }) => v.isCatalogVariant);
+
+  const variantsPayload = catalogVariantsForPayload.map(({ v, vIdx }) => {
     const variantPlans = plansSource
       .filter((p) => variantIndexMatchesEditor(p, vIdx))
       .map((p) => withPartnerId(p, getVariantEffectivePrice(v)));
@@ -485,6 +566,7 @@ export const buildInstallmentUpdateBody = ({
       variants: variantsPayload,
       partnerBasePrice,
       partnerVariantPricing: buildPartnerVariantPricing(form.variants),
+      partnerOwnedVariants: buildPartnerOwnedVariantsPayload(form.variants),
     };
   }
 
@@ -527,16 +609,29 @@ export const submitInstallmentPlanUpdate = async ({
   isAttachedProduct,
   baseApi,
   token,
+  savePricingOnly = false,
 }) => {
   const profile = getPartnerProfileFromStorage();
   const uid = editorUserId || profile.userId;
 
-  for (const plan of form.paymentPlans || []) {
-    if (!plan.planName || !Number(plan.installmentPrice)) {
-      throw new Error(
-        `Plan "${plan.planName || "New plan"}" needs a name and valid total payable before saving.`
-      );
+  if (!savePricingOnly) {
+    for (const plan of form.paymentPlans || []) {
+      if (!plan.planName || !Number(plan.installmentPrice)) {
+        throw new Error(
+          `Plan "${plan.planName || "New plan"}" needs a name and valid total payable before saving.`
+        );
+      }
     }
+  }
+
+  if (savePricingOnly && isAttachedProduct) {
+    return submitPartnerCatalogPricing({
+      installmentId,
+      form,
+      editorUserId: uid,
+      baseApi,
+      token,
+    });
   }
 
   const patch = buildInstallmentUpdateBody({

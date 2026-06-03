@@ -41,6 +41,7 @@ const EditInstallmentPlan = () => {
   const [localImages, setLocalImages] = useState([]);
   const [isAttachedProduct, setIsAttachedProduct] = useState(false);
   const [step4Tab, setStep4Tab] = useState('installments');
+  const [savePricingOnly, setSavePricingOnly] = useState(false);
 
   const [form, setForm] = useState({
     userId: "",
@@ -323,9 +324,14 @@ const EditInstallmentPlan = () => {
         isAttachedProduct,
         baseApi,
         token,
+        savePricingOnly: savePricingOnly && isAttachedProduct,
       });
 
-      setMessage("Installment plan updated successfully!");
+      setMessage(
+        savePricingOnly && isAttachedProduct
+          ? "Your cash prices and variants saved on this product."
+          : "Installment plan updated successfully!"
+      );
       setTimeout(() => navigate('/installments'), 2000);
     } catch (err) {
       setError(err?.message || "Server error. Please try again.");
@@ -340,6 +346,18 @@ const EditInstallmentPlan = () => {
     if (step === 1) return form.productName && form.city && form.category;
     if (step === 3 && !fieldsLocked) return form.productImages.length > 0;
     if (step === 4) {
+      const productPrice = deriveProductPrice(form.variants, form.price);
+      if (savePricingOnly && fieldsLocked) {
+        if (!productPrice) return false;
+        if (showVariantSection && form.variants.length > 0) {
+          return form.variants.every(
+            (v) =>
+              String(v.variantName || "").trim() &&
+              (v.isCatalogVariant ? Number(v.price) > 0 : Number(v.price) > 0)
+          );
+        }
+        return true;
+      }
       if (!form.paymentPlans.length) return false;
       if (showVariantSection && !fieldsLocked) {
         if (form.variants.length === 0) return false;
@@ -740,47 +758,236 @@ const EditInstallmentPlan = () => {
               <>
               {showVariantSection && (
                 <div className="space-y-4 p-6 bg-blue-50 border border-blue-200 rounded-xl">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
-                      {!fieldsLocked && (
+                      {fieldsLocked ? (
+                        <>
+                          <h3 className="text-lg font-bold text-gray-800">Your pricing on this product</h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Set your cash price on catalog variants, or add your own variant with a cash price only. Installment plans are optional.
+                          </p>
+                        </>
+                      ) : (
                         <>
                           <h3 className="text-lg font-bold text-gray-800">Product Variants</h3>
                           <p className="text-sm text-gray-600 mt-1">Add variant options with cash price and optional discount (% off cash price).</p>
                         </>
                       )}
                     </div>
-                    {!fieldsLocked && (
-                      <button type="button" onClick={() => setForm(f => ({ ...f, variants: [...f.variants, { variantName: "", price: "", discountPercent: 0, status: "active" }] }))} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">+ Add Variant</button>
+                    {fieldsLocked ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            variants: [
+                              ...f.variants,
+                              {
+                                variantName: "",
+                                price: "",
+                                discountPercent: 0,
+                                status: "active",
+                                isCatalogVariant: false,
+                                isPartnerOwned: true,
+                              },
+                            ],
+                          }))
+                        }
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                      >
+                        + Add your variant
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            variants: [
+                              ...f.variants,
+                              { variantName: "", price: "", discountPercent: 0, status: "active" },
+                            ],
+                          }))
+                        }
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                      >
+                        + Add Variant
+                      </button>
                     )}
                   </div>
+                  {fieldsLocked && (
+                    <div className="p-4 bg-white border-2 border-dashed border-blue-300 rounded-xl space-y-3">
+                      <p className="text-sm font-bold text-gray-800">What do you want to save?</p>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSavePricingOnly(true)}
+                          className={`px-5 py-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                            savePricingOnly
+                              ? "bg-emerald-600 border-emerald-600 text-white shadow-md"
+                              : "bg-white border-gray-200 text-gray-700 hover:border-emerald-400"
+                          }`}
+                        >
+                          Cash prices only
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSavePricingOnly(false)}
+                          className={`px-5 py-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                            !savePricingOnly
+                              ? "bg-red-600 border-red-600 text-white shadow-md"
+                              : "bg-white border-gray-200 text-gray-700 hover:border-red-300"
+                          }`}
+                        >
+                          Cash + installment plans
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-600">
+                        {savePricingOnly
+                          ? "Update your catalog variant prices or your own variants — payment plans stay unchanged."
+                          : "Save cash prices and your payment plan changes together."}
+                      </p>
+                    </div>
+                  )}
                   {form.variants.length === 0 ? (
-                    <p className="text-sm text-gray-500 py-4 text-center">{fieldsLocked ? "This product has no variants. Use your cash price below." : "Add at least one variant before creating payment plans."}</p>
+                    <p className="text-sm text-gray-500 py-4 text-center">
+                      {fieldsLocked
+                        ? "Add your cash price below, or add a variant option for your company."
+                        : "Add at least one variant before creating payment plans."}
+                    </p>
                   ) : (
                     <div className="space-y-4">
                       {form.variants.map((variant, vIdx) => (
                         <div key={vIdx} className="p-4 bg-white border border-gray-200 rounded-xl relative">
-                          {!fieldsLocked && (
-                            <button type="button" onClick={() => setForm(f => ({ ...f, variants: f.variants.filter((_, i) => i !== vIdx) }))} className="absolute top-3 right-3 text-gray-400 hover:text-red-600"><X className="w-5 h-5" /></button>
+                          {(!fieldsLocked || variant.isPartnerOwned) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setForm((f) => ({
+                                  ...f,
+                                  variants: f.variants.filter((_, i) => i !== vIdx),
+                                }))
+                              }
+                              className="absolute top-3 right-3 text-gray-400 hover:text-red-600"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
                           )}
-                          {fieldsLocked ? (
+                          {fieldsLocked && variant.isCatalogVariant ? (
                             <div className="space-y-4">
                               <div className="space-y-1">
-                                <span className="text-xs font-medium text-gray-500">Product variant (from listing — not editable)</span>
-                                <p className="text-base font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 cursor-default">{variant.variantName || `Variant ${vIdx + 1}`}</p>
+                                <span className="text-xs font-medium text-gray-500">Catalog variant (listing — name not editable)</span>
+                                <p className="text-base font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 cursor-default">
+                                  {variant.variantName || `Variant ${vIdx + 1}`}
+                                  {variant.listingPrice != null && (
+                                    <span className="block text-xs font-normal text-gray-500 mt-1">
+                                      Listed at ₨ {Number(variant.listingPrice).toLocaleString()}
+                                    </span>
+                                  )}
+                                </p>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <InputField label="Your Cash Price (₨) *" type="number" value={variant.price} onChange={v => { const nv = [...form.variants]; nv[vIdx].price = v; setForm(f => ({ ...f, variants: nv })); }} />
-                                <InputField label="Your Discount (%)" type="number" value={variant.discountPercent ?? ""} onChange={v => { const nv = [...form.variants]; nv[vIdx].discountPercent = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="0" />
+                                <InputField
+                                  label="Your Cash Price (₨) *"
+                                  type="number"
+                                  value={variant.price}
+                                  onChange={(v) => {
+                                    const nv = [...form.variants];
+                                    nv[vIdx].price = v;
+                                    setForm((f) => ({ ...f, variants: nv }));
+                                  }}
+                                />
+                                <InputField
+                                  label="Your Discount (%)"
+                                  type="number"
+                                  value={variant.discountPercent ?? ""}
+                                  onChange={(v) => {
+                                    const nv = [...form.variants];
+                                    nv[vIdx].discountPercent = v;
+                                    setForm((f) => ({ ...f, variants: nv }));
+                                  }}
+                                  placeholder="0"
+                                />
+                              </div>
+                            </div>
+                          ) : fieldsLocked && variant.isPartnerOwned ? (
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 pr-8">
+                              <InputField
+                                label="Your variant name *"
+                                value={variant.variantName}
+                                onChange={(v) => {
+                                  const nv = [...form.variants];
+                                  nv[vIdx].variantName = v;
+                                  setForm((f) => ({ ...f, variants: nv }));
+                                }}
+                                placeholder="e.g. 12GB / 256GB — your offer"
+                              />
+                              <InputField
+                                label="Your Cash Price (₨) *"
+                                type="number"
+                                value={variant.price}
+                                onChange={(v) => {
+                                  const nv = [...form.variants];
+                                  nv[vIdx].price = v;
+                                  setForm((f) => ({ ...f, variants: nv }));
+                                }}
+                              />
+                              <InputField
+                                label="Discount (%)"
+                                type="number"
+                                value={variant.discountPercent ?? ""}
+                                onChange={(v) => {
+                                  const nv = [...form.variants];
+                                  nv[vIdx].discountPercent = v;
+                                  setForm((f) => ({ ...f, variants: nv }));
+                                }}
+                                placeholder="0"
+                              />
+                              <div className="flex flex-col justify-end">
+                                <span className="text-xs text-gray-500">Effective cash price</span>
+                                <span className="text-lg font-bold text-red-600">
+                                  ₨ {getVariantEffectivePrice(variant).toLocaleString()}
+                                </span>
                               </div>
                             </div>
                           ) : (
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-4 pr-8">
-                              <InputField label="Variant Name *" value={variant.variantName} onChange={v => { const nv = [...form.variants]; nv[vIdx].variantName = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="e.g. 12GB / 256GB" />
-                              <InputField label="Cash Price (₨) *" type="number" value={variant.price} onChange={v => { const nv = [...form.variants]; nv[vIdx].price = v; setForm(f => ({ ...f, variants: nv })); }} />
-                              <InputField label="Discount (%)" type="number" value={variant.discountPercent ?? ""} onChange={v => { const nv = [...form.variants]; nv[vIdx].discountPercent = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="0" />
+                              <InputField
+                                label="Variant Name *"
+                                value={variant.variantName}
+                                onChange={(v) => {
+                                  const nv = [...form.variants];
+                                  nv[vIdx].variantName = v;
+                                  setForm((f) => ({ ...f, variants: nv }));
+                                }}
+                                placeholder="e.g. 12GB / 256GB"
+                              />
+                              <InputField
+                                label="Cash Price (₨) *"
+                                type="number"
+                                value={variant.price}
+                                onChange={(v) => {
+                                  const nv = [...form.variants];
+                                  nv[vIdx].price = v;
+                                  setForm((f) => ({ ...f, variants: nv }));
+                                }}
+                              />
+                              <InputField
+                                label="Discount (%)"
+                                type="number"
+                                value={variant.discountPercent ?? ""}
+                                onChange={(v) => {
+                                  const nv = [...form.variants];
+                                  nv[vIdx].discountPercent = v;
+                                  setForm((f) => ({ ...f, variants: nv }));
+                                }}
+                                placeholder="0"
+                              />
                               <div className="flex flex-col justify-end">
                                 <span className="text-xs text-gray-500">Effective cash price</span>
-                                <span className="text-lg font-bold text-red-600">₨ {getVariantEffectivePrice(variant).toLocaleString()}</span>
+                                <span className="text-lg font-bold text-red-600">
+                                  ₨ {getVariantEffectivePrice(variant).toLocaleString()}
+                                </span>
                               </div>
                             </div>
                           )}
@@ -795,6 +1002,7 @@ const EditInstallmentPlan = () => {
                 <InputField label={fieldsLocked ? "Your Cash Price (₨)" : "Cash Price (₨) *"} type="number" value={form.price} onChange={v => updateForm('price', v)} placeholder="Cash price for installment calculations" />
               )}
 
+              {!(savePricingOnly && fieldsLocked) && (
               <div className="space-y-6">
                 {form.paymentPlans.map((p, idx) => (
                   <PaymentPlanCard
@@ -825,6 +1033,7 @@ const EditInstallmentPlan = () => {
                   className="mt-2"
                 />
               </div>
+              )}
               </>
               )}
             </div>
@@ -859,7 +1068,11 @@ const EditInstallmentPlan = () => {
                 disabled={loading || !isStepValid()}
                 className="px-8 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg font-semibold hover:from-red-700 hover:to-red-800 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Updating...' : 'Update Installment Plan'}
+                {loading
+                  ? 'Updating...'
+                  : savePricingOnly && isAttachedProduct
+                    ? 'Save your pricing'
+                    : 'Update Installment Plan'}
               </button>
             )}
           </div>

@@ -15,19 +15,146 @@ export const DEFAULT_INSTALLMENT_PLAN = {
   hasFinance: false,
 };
 
+/** Auto discount % from cash price and discounted price: ((cash - discounted) / cash) * 100 */
+export const calcDiscountPercentFromPrices = (cashPrice, discountedPrice) => {
+  const cash = Number(cashPrice) || 0;
+  const discounted = Number(discountedPrice);
+  if (cash <= 0 || !Number.isFinite(discounted) || discounted < 0) return 0;
+  const pct = ((cash - discounted) / cash) * 100;
+  return Math.round(Math.min(100, Math.max(0, pct)) * 100) / 100;
+};
+
+export const calcDiscountedPriceFromPercent = (cashPrice, discountPercent) => {
+  const cash = Number(cashPrice) || 0;
+  const disc = Math.min(100, Math.max(0, Number(discountPercent) || 0));
+  return Math.round(cash * (1 - disc / 100));
+};
+
+/** Step 4 save modes on create installment */
+export const STEP4_SAVE_MODES = {
+  CASH: "cash",
+  CASH_INSTALLMENTS: "cash_installments",
+  INSTALLMENTS_ONLY: "installments_only",
+};
+
+/** Sync variant cash / discounted price and auto-calc discount % */
+export const applyVariantPricingUpdate = (variant, field, value) => {
+  const next = { ...variant, [field]: value };
+  const cash = Number(next.price) || 0;
+
+  if (field === "price") {
+    const discounted = Number(next.discountedPrice);
+    if (!next.discountedPrice && next.discountedPrice !== 0) {
+      next.discountedPrice = value;
+    } else if (discounted > cash && cash > 0) {
+      next.discountedPrice = value;
+    }
+    next.discountPercent = calcDiscountPercentFromPrices(
+      cash,
+      Number(next.discountedPrice) ?? cash
+    );
+  } else if (field === "discountedPrice") {
+    const discounted = Number(value);
+    if (cash > 0 && Number.isFinite(discounted)) {
+      next.discountedPrice = discounted > cash ? cash : discounted;
+      next.discountPercent = calcDiscountPercentFromPrices(cash, next.discountedPrice);
+    }
+  }
+
+  return next;
+};
+
+/** Sync base product price fields (no variants) */
+export const applyBasePricingUpdate = (form, field, value) => {
+  const next = { ...form, [field]: value };
+  const cash = Number(next.price) || 0;
+
+  if (field === "price") {
+    if (!next.discountedPrice && next.discountedPrice !== 0) {
+      next.discountedPrice = value;
+    } else if (Number(next.discountedPrice) > cash && cash > 0) {
+      next.discountedPrice = value;
+    }
+    next.discountPercent = calcDiscountPercentFromPrices(
+      cash,
+      Number(next.discountedPrice) ?? cash
+    );
+  } else if (field === "discountedPrice") {
+    const discounted = Number(value);
+    if (cash > 0 && Number.isFinite(discounted)) {
+      next.discountedPrice = discounted > cash ? cash : discounted;
+      next.discountPercent = calcDiscountPercentFromPrices(cash, next.discountedPrice);
+    }
+  }
+
+  return next;
+};
+
 export const getVariantEffectivePrice = (variant) => {
   if (!variant) return 0;
+  const discounted = Number(variant.discountedPrice);
+  if (Number.isFinite(discounted) && discounted > 0) {
+    return Math.round(discounted);
+  }
   const base = Number(variant.price) || 0;
   const disc = Math.min(100, Math.max(0, Number(variant.discountPercent) || 0));
   return Math.round(base * (1 - disc / 100));
 };
 
-export const deriveProductPrice = (variants, fallback = 0) => {
+/** Effective price when product has no variant rows */
+export const getBaseEffectivePrice = (form) => {
+  const discounted = Number(form?.discountedPrice);
+  if (Number.isFinite(discounted) && discounted > 0) return Math.round(discounted);
+  const cash = Number(form?.price) || 0;
+  const disc = Math.min(100, Math.max(0, Number(form?.discountPercent) || 0));
+  return Math.round(cash * (1 - disc / 100));
+};
+
+export const deriveProductPrice = (variants, fallback = 0, formForBase = null) => {
   if (variants?.length) {
     const prices = variants.map(getVariantEffectivePrice).filter((p) => p > 0);
     if (prices.length) return Math.min(...prices);
   }
+  if (formForBase && (formForBase.discountedPrice != null || formForBase.discountPercent != null)) {
+    const baseEff = getBaseEffectivePrice(formForBase);
+    if (baseEff > 0) return baseEff;
+  }
   return Number(fallback) || 0;
+};
+
+/** Variants payload for create — strips cash prices when saving installments only */
+export const mapVariantsForCreatePayload = (variants, activePlans, options = {}) => {
+  const { installmentsOnly, planPayloadWithFinance, getVariantCashForPlan } = options;
+
+  return (variants || []).map((v, vIdx) => {
+    const variantPlans = (activePlans || [])
+      .filter((p) => Number(p?.variantIndex) === vIdx)
+      .map((p) => ({
+        ...planPayloadWithFinance(p),
+        cashPrice: getVariantCashForPlan(p, v),
+        installmentPrice: Number(p.installmentPrice),
+        downPayment: Number(p.downPayment),
+        monthlyInstallment: Number(p.monthlyInstallment),
+      }));
+
+    if (installmentsOnly) {
+      return {
+        variantName: v.variantName,
+        price: 0,
+        discountPercent: 0,
+        status: v.status || "active",
+        paymentPlans: variantPlans,
+      };
+    }
+
+    return {
+      variantName: v.variantName,
+      price: Number(v.price),
+      discountPercent: Number(v.discountPercent) || 0,
+      status: v.status || "active",
+      paymentPlans: variantPlans,
+    };
+  });
 };
 
 export const getProductOwnerUserId = (product) =>
@@ -207,6 +334,21 @@ export const normalizePlansForForm = (plans, variants) =>
     };
   });
 
+const enrichVariantWithDiscountedPrice = (v) => {
+  const price = Number(v?.price) || 0;
+  const discounted =
+    v?.discountedPrice !== undefined && v?.discountedPrice !== ""
+      ? v.discountedPrice
+      : price > 0
+      ? calcDiscountedPriceFromPercent(price, v?.discountPercent)
+      : "";
+  return {
+    ...v,
+    discountedPrice: discounted,
+    discountPercent: v?.discountPercent ?? 0,
+  };
+};
+
 export const mapProductVariantsForPartner = (product, partnerId) => {
   const partnerEntry = (product?.partnerPricing || []).find(
     (p) => p?.partnerId && String(p.partnerId) === String(partnerId)
@@ -247,18 +389,20 @@ export const mapProductVariantsForPartner = (product, partnerId) => {
     });
   });
 
-  return rows;
+  return rows.map(enrichVariantWithDiscountedPrice);
 };
 
 export const mapVariantsForOwnerEditor = (variants) =>
-  (variants || []).map((v, i) => ({
-    variantName: v.variantName || `Variant ${i + 1}`,
-    price: v.price ?? "",
-    discountPercent: v.discountPercent ?? 0,
-    status: v.status || "active",
-    isCatalogVariant: false,
-    sourceVariantIndex: i,
-  }));
+  (variants || []).map((v, i) =>
+    enrichVariantWithDiscountedPrice({
+      variantName: v.variantName || `Variant ${i + 1}`,
+      price: v.price ?? "",
+      discountPercent: v.discountPercent ?? 0,
+      status: v.status || "active",
+      isCatalogVariant: false,
+      sourceVariantIndex: i,
+    })
+  );
 
 export const getPartnerPricingEntry = (product, partnerId) =>
   (product?.partnerPricing || []).find(
@@ -288,12 +432,21 @@ export const mapInstallmentPlanToForm = (plan, partnerUserId) => {
     attached && partnerEntry?.basePrice
       ? partnerEntry.basePrice
       : plan.price ?? "";
+  const discountPercent = attached
+    ? 0
+    : Number(plan.discountPercent) || 0;
+  const discountedPrice =
+    Number(price) > 0
+      ? calcDiscountedPriceFromPercent(price, discountPercent)
+      : "";
 
   return {
     userId: partnerUserId || "",
     productName: plan.productName || "",
     city: plan.city || "",
     price,
+    discountedPrice,
+    discountPercent,
     partnerBasePrice: partnerEntry?.basePrice ?? "",
     downpayment: plan.downpayment ?? "",
     installment: plan.installment ?? "",
@@ -396,7 +549,7 @@ export const cashPriceForPlan = (plan, form) => {
   if (vIdx !== undefined && vIdx !== null && vIdx !== -1 && form.variants?.[vIdx]) {
     return getVariantEffectivePrice(form.variants[vIdx]);
   }
-  return deriveProductPrice(form.variants, form.price);
+  return deriveProductPrice(form.variants, form.price, form);
 };
 
 export const isExistingStoredPlan = (plan) => {
@@ -500,9 +653,11 @@ export const buildInstallmentUpdateBody = ({
   editorUserId,
   isAttachedProduct,
   plansForUpdate,
+  installmentsOnly = false,
 }) => {
   const plansSource = plansForUpdate ?? form.paymentPlans ?? [];
-  const productPrice = deriveProductPrice(form.variants, form.price);
+  const calcProductPrice = deriveProductPrice(form.variants, form.price, form);
+  const productPrice = installmentsOnly ? 0 : calcProductPrice;
   const profile = getPartnerProfileFromStorage();
 
   const withPartnerId = (p, cashPrice) => {
@@ -535,6 +690,40 @@ export const buildInstallmentUpdateBody = ({
       };
     }
 
+    if (installmentsOnly) {
+      return {
+        variantName: v.variantName,
+        price: 0,
+        discountPercent: 0,
+        status: v.status || "active",
+        paymentPlans: variantPlans,
+      };
+    }
+
+    return {
+      variantName: v.variantName,
+      price: Number(v.price) || 0,
+      discountPercent: Number(v.discountPercent) || 0,
+      status: v.status || "active",
+      paymentPlans: variantPlans,
+    };
+  });
+
+  const ownerVariantsPayload = (form.variants || []).map((v, vIdx) => {
+    const variantPlans = plansSource
+      .filter((p) => variantIndexMatchesEditor(p, vIdx))
+      .map((p) => withPartnerId(p, getVariantEffectivePrice(v)));
+
+    if (installmentsOnly) {
+      return {
+        variantName: v.variantName,
+        price: 0,
+        discountPercent: 0,
+        status: v.status || "active",
+        paymentPlans: variantPlans,
+      };
+    }
+
     return {
       variantName: v.variantName,
       price: Number(v.price) || 0,
@@ -555,19 +744,21 @@ export const buildInstallmentUpdateBody = ({
         raw === ""
       );
     })
-    .map((p) => withPartnerId(p, productPrice));
+    .map((p) => withPartnerId(p, installmentsOnly ? calcProductPrice : productPrice));
 
   if (isAttachedProduct) {
-    const partnerBasePrice = Number(form.partnerBasePrice || form.price) || 0;
-    return {
+    const body = {
       userId: editorUserId,
       mergePartnerPlans: true,
       paymentPlans: rootPlans,
       variants: variantsPayload,
-      partnerBasePrice,
-      partnerVariantPricing: buildPartnerVariantPricing(form.variants),
-      partnerOwnedVariants: buildPartnerOwnedVariantsPayload(form.variants),
     };
+    if (!installmentsOnly) {
+      body.partnerBasePrice = Number(form.partnerBasePrice || form.price) || 0;
+      body.partnerVariantPricing = buildPartnerVariantPricing(form.variants);
+      body.partnerOwnedVariants = buildPartnerOwnedVariantsPayload(form.variants);
+    }
+    return body;
   }
 
   const category =
@@ -594,7 +785,7 @@ export const buildInstallmentUpdateBody = ({
     productImages: form.productImages || [],
     productSpecifications: form.productSpecifications || {},
     finance: form.finance || {},
-    variants: variantsPayload,
+    variants: ownerVariantsPayload.length ? ownerVariantsPayload : variantsPayload,
     paymentPlans: rootPlans,
   };
 };
@@ -610,11 +801,17 @@ export const submitInstallmentPlanUpdate = async ({
   baseApi,
   token,
   savePricingOnly = false,
+  step4SaveMode,
 }) => {
   const profile = getPartnerProfileFromStorage();
   const uid = editorUserId || profile.userId;
 
-  if (!savePricingOnly) {
+  const mode = step4SaveMode
+    || (savePricingOnly ? STEP4_SAVE_MODES.CASH : STEP4_SAVE_MODES.CASH_INSTALLMENTS);
+  const isCashOnly = mode === STEP4_SAVE_MODES.CASH;
+  const isInstallmentsOnly = mode === STEP4_SAVE_MODES.INSTALLMENTS_ONLY;
+
+  if (!isCashOnly) {
     for (const plan of form.paymentPlans || []) {
       if (!plan.planName || !Number(plan.installmentPrice)) {
         throw new Error(
@@ -624,7 +821,7 @@ export const submitInstallmentPlanUpdate = async ({
     }
   }
 
-  if (savePricingOnly && isAttachedProduct) {
+  if (isCashOnly && isAttachedProduct) {
     return submitPartnerCatalogPricing({
       installmentId,
       form,
@@ -639,6 +836,7 @@ export const submitInstallmentPlanUpdate = async ({
     editorUserId: uid,
     isAttachedProduct,
     plansForUpdate: form.paymentPlans,
+    installmentsOnly: isInstallmentsOnly,
   });
 
   enrichUpdatePayloadWithPartnerMeta(patch, profile, uid);

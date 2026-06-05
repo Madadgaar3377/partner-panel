@@ -14,11 +14,15 @@ import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 import {
   DEFAULT_INSTALLMENT_PLAN,
+  STEP4_SAVE_MODES,
   getVariantEffectivePrice,
+  getBaseEffectivePrice,
   deriveProductPrice,
   mapInstallmentPlanToForm,
   submitInstallmentPlanUpdate,
   deletePartnerPaymentPlanApi,
+  applyVariantPricingUpdate,
+  applyBasePricingUpdate,
 } from '../../utils/installmentPartnerPlans';
 import {
   PartnerStep4Tabs,
@@ -41,13 +45,15 @@ const EditInstallmentPlan = () => {
   const [localImages, setLocalImages] = useState([]);
   const [isAttachedProduct, setIsAttachedProduct] = useState(false);
   const [step4Tab, setStep4Tab] = useState('installments');
-  const [savePricingOnly, setSavePricingOnly] = useState(false);
+  const [step4SaveMode, setStep4SaveMode] = useState(STEP4_SAVE_MODES.CASH_INSTALLMENTS);
 
   const [form, setForm] = useState({
     userId: "",
     productName: "",
     city: "",
     price: "",
+    discountedPrice: "",
+    discountPercent: 0,
     partnerBasePrice: "",
     downpayment: "",
     installment: "",
@@ -218,7 +224,7 @@ const EditInstallmentPlan = () => {
       if (p.variantIndex !== undefined && p.variantIndex !== null && p.variantIndex !== -1 && f.variants?.[p.variantIndex]) {
         cashPrice = getVariantEffectivePrice(f.variants[p.variantIndex]);
       } else {
-        cashPrice = deriveProductPrice(f.variants, f.price);
+        cashPrice = deriveProductPrice(f.variants, f.price, f);
       }
 
       const downPayment = Number(p.downPayment) || 0;
@@ -324,12 +330,14 @@ const EditInstallmentPlan = () => {
         isAttachedProduct,
         baseApi,
         token,
-        savePricingOnly: savePricingOnly && isAttachedProduct,
+        step4SaveMode,
       });
 
       setMessage(
-        savePricingOnly && isAttachedProduct
+        step4SaveMode === STEP4_SAVE_MODES.CASH && isAttachedProduct
           ? "Your cash prices and variants saved on this product."
+          : step4SaveMode === STEP4_SAVE_MODES.INSTALLMENTS_ONLY
+          ? "Installment plans updated (cash prices not changed)."
           : "Installment plan updated successfully!"
       );
       setTimeout(() => navigate('/installments'), 2000);
@@ -342,26 +350,74 @@ const EditInstallmentPlan = () => {
 
   const showVariantSection = Boolean(form.category);
   const fieldsLocked = isAttachedProduct;
+  const isCashOnlyMode = step4SaveMode === STEP4_SAVE_MODES.CASH;
+  const isInstallmentsOnlyMode = step4SaveMode === STEP4_SAVE_MODES.INSTALLMENTS_ONLY;
+  const showPaymentPlans = !isCashOnlyMode;
+
+  const updateVariantPricing = (vIdx, field, value) => {
+    setForm((f) => {
+      const nv = [...f.variants];
+      nv[vIdx] = applyVariantPricingUpdate(nv[vIdx], field, value);
+      return { ...f, variants: nv };
+    });
+  };
+
+  const updateBasePricing = (field, value) => {
+    setForm((f) => applyBasePricingUpdate(f, field, value));
+  };
+
+  const variantHasCalcPrice = (v) => {
+    const cash = Number(v?.price) || 0;
+    const effective = getVariantEffectivePrice(v);
+    return cash > 0 && effective > 0;
+  };
+
   const isStepValid = () => {
     if (step === 1) return form.productName && form.city && form.category;
     if (step === 3 && !fieldsLocked) return form.productImages.length > 0;
     if (step === 4) {
-      const productPrice = deriveProductPrice(form.variants, form.price);
-      if (savePricingOnly && fieldsLocked) {
+      const productPrice = deriveProductPrice(form.variants, form.price, form);
+
+      if (isCashOnlyMode) {
         if (!productPrice) return false;
         if (showVariantSection && form.variants.length > 0) {
-          return form.variants.every(
-            (v) =>
-              String(v.variantName || "").trim() &&
-              (v.isCatalogVariant ? Number(v.price) > 0 : Number(v.price) > 0)
-          );
+          return form.variants.every((v) => {
+            if (!variantHasCalcPrice(v)) return false;
+            if (!v.isCatalogVariant && !String(v.variantName || "").trim()) return false;
+            return true;
+          });
         }
-        return true;
+        return Number(form.price) > 0;
       }
+
+      if (isInstallmentsOnlyMode) {
+        if (!form.paymentPlans.length) return false;
+        if (showVariantSection) {
+          if (!form.variants.length) return false;
+          const namesOk = form.variants.every((v) =>
+            v.isCatalogVariant || String(v.variantName || "").trim()
+          );
+          if (!namesOk) return false;
+          const everyPlanHasVariant = form.paymentPlans.every((p) => {
+            const ix = p.variantIndex;
+            return ix !== null && ix !== undefined && ix !== "" && ix !== -1 && ix !== "-1";
+          });
+          if (!everyPlanHasVariant) return false;
+          return form.paymentPlans.every((p) => {
+            const ix = Number(p.variantIndex);
+            return variantHasCalcPrice(form.variants[ix]);
+          }) && form.paymentPlans.every((p) => p.planName && Number(p.installmentPrice) > 0);
+        }
+        return (
+          getBaseEffectivePrice(form) > 0 &&
+          form.paymentPlans.every((p) => p.planName && Number(p.installmentPrice) > 0)
+        );
+      }
+
       if (!form.paymentPlans.length) return false;
       if (showVariantSection && !fieldsLocked) {
         if (form.variants.length === 0) return false;
-        if (form.variants.some((v) => !v.variantName || !Number(v.price))) return false;
+        if (form.variants.some((v) => !v.variantName || !variantHasCalcPrice(v))) return false;
       }
       if (showVariantSection && fieldsLocked) {
         const planVariantIdxs = form.paymentPlans
@@ -369,7 +425,7 @@ const EditInstallmentPlan = () => {
           .filter((ix) => ix !== null && ix !== undefined && ix !== -1 && ix !== "");
         if (form.variants.length > 0) {
           if (planVariantIdxs.length !== form.paymentPlans.length) return false;
-          if (!planVariantIdxs.every((ix) => Number(form.variants[Number(ix)]?.price) > 0)) return false;
+          if (!planVariantIdxs.every((ix) => variantHasCalcPrice(form.variants[Number(ix)]))) return false;
         } else if (!Number(form.price)) {
           return false;
         }
@@ -740,7 +796,7 @@ const EditInstallmentPlan = () => {
                 <div className="text-right">
                   <p className="text-xs text-gray-500">Reference cash price</p>
                   <p className="text-xl font-bold text-red-600">
-                    ₨ {deriveProductPrice(form.variants, form.price).toLocaleString()}
+                    ₨ {deriveProductPrice(form.variants, form.price, form).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -756,6 +812,54 @@ const EditInstallmentPlan = () => {
 
               {(step4Tab === 'installments' || step4Tab === 'both') && (
               <>
+              <div className="p-4 bg-white border-2 border-dashed border-blue-300 rounded-xl space-y-3">
+                <p className="text-sm font-bold text-gray-800">What do you want to save?</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep4SaveMode(STEP4_SAVE_MODES.CASH)}
+                    className={`px-5 py-2.5 rounded-full text-sm font-bold border-2 transition-all ${
+                      isCashOnlyMode
+                        ? "bg-emerald-600 border-emerald-600 text-white shadow-md"
+                        : "bg-white border-gray-200 text-gray-700 hover:border-emerald-400"
+                    }`}
+                  >
+                    Cash price
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep4SaveMode(STEP4_SAVE_MODES.CASH_INSTALLMENTS)}
+                    className={`px-5 py-2.5 rounded-full text-sm font-bold border-2 transition-all ${
+                      step4SaveMode === STEP4_SAVE_MODES.CASH_INSTALLMENTS
+                        ? "bg-red-600 border-red-600 text-white shadow-md"
+                        : "bg-white border-gray-200 text-gray-700 hover:border-red-300"
+                    }`}
+                  >
+                    Cash + installments
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep4SaveMode(STEP4_SAVE_MODES.INSTALLMENTS_ONLY)}
+                    className={`px-5 py-2.5 rounded-full text-sm font-bold border-2 transition-all ${
+                      isInstallmentsOnlyMode
+                        ? "bg-violet-600 border-violet-600 text-white shadow-md"
+                        : "bg-white border-gray-200 text-gray-700 hover:border-violet-400"
+                    }`}
+                  >
+                    Only installments
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600">
+                  {isCashOnlyMode
+                    ? fieldsLocked
+                      ? "Update your catalog variant prices or your own variants — payment plans stay unchanged."
+                      : "Save variant cash prices only; installment plans stay unchanged."
+                    : isInstallmentsOnlyMode
+                    ? "Enter cash price for installment calculations only — stored cash prices on the product will not be updated."
+                    : "Save cash prices and your payment plan changes together."}
+                </p>
+              </div>
+
               {showVariantSection && (
                 <div className="space-y-4 p-6 bg-blue-50 border border-blue-200 rounded-xl">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -764,13 +868,19 @@ const EditInstallmentPlan = () => {
                         <>
                           <h3 className="text-lg font-bold text-gray-800">Your pricing on this product</h3>
                           <p className="text-sm text-gray-600 mt-1">
-                            Set your cash price on catalog variants, or add your own variant with a cash price only. Installment plans are optional.
+                            {isInstallmentsOnlyMode
+                              ? "Cash & discounted price for calculations — not saved in Only installments mode."
+                              : "Set your cash price on catalog variants, or add your own variant."}
                           </p>
                         </>
                       ) : (
                         <>
                           <h3 className="text-lg font-bold text-gray-800">Product Variants</h3>
-                          <p className="text-sm text-gray-600 mt-1">Add variant options with cash price and optional discount (% off cash price).</p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {isInstallmentsOnlyMode
+                              ? "Add variants for plan targeting. Cash & discounted prices are for calculation only."
+                              : "Cash price + discounted price → discount % is calculated automatically."}
+                          </p>
                         </>
                       )}
                     </div>
@@ -785,6 +895,7 @@ const EditInstallmentPlan = () => {
                               {
                                 variantName: "",
                                 price: "",
+                                discountedPrice: "",
                                 discountPercent: 0,
                                 status: "active",
                                 isCatalogVariant: false,
@@ -805,7 +916,7 @@ const EditInstallmentPlan = () => {
                             ...f,
                             variants: [
                               ...f.variants,
-                              { variantName: "", price: "", discountPercent: 0, status: "active" },
+                              { variantName: "", price: "", discountedPrice: "", discountPercent: 0, status: "active" },
                             ],
                           }))
                         }
@@ -815,40 +926,6 @@ const EditInstallmentPlan = () => {
                       </button>
                     )}
                   </div>
-                  {fieldsLocked && (
-                    <div className="p-4 bg-white border-2 border-dashed border-blue-300 rounded-xl space-y-3">
-                      <p className="text-sm font-bold text-gray-800">What do you want to save?</p>
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setSavePricingOnly(true)}
-                          className={`px-5 py-3 rounded-xl text-sm font-bold border-2 transition-all ${
-                            savePricingOnly
-                              ? "bg-emerald-600 border-emerald-600 text-white shadow-md"
-                              : "bg-white border-gray-200 text-gray-700 hover:border-emerald-400"
-                          }`}
-                        >
-                          Cash prices only
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSavePricingOnly(false)}
-                          className={`px-5 py-3 rounded-xl text-sm font-bold border-2 transition-all ${
-                            !savePricingOnly
-                              ? "bg-red-600 border-red-600 text-white shadow-md"
-                              : "bg-white border-gray-200 text-gray-700 hover:border-red-300"
-                          }`}
-                        >
-                          Cash + installment plans
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-600">
-                        {savePricingOnly
-                          ? "Update your catalog variant prices or your own variants — payment plans stay unchanged."
-                          : "Save cash prices and your payment plan changes together."}
-                      </p>
-                    </div>
-                  )}
                   {form.variants.length === 0 ? (
                     <p className="text-sm text-gray-500 py-4 text-center">
                       {fieldsLocked
@@ -886,32 +963,14 @@ const EditInstallmentPlan = () => {
                                   )}
                                 </p>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <InputField
-                                  label="Your Cash Price (₨) *"
-                                  type="number"
-                                  value={variant.price}
-                                  onChange={(v) => {
-                                    const nv = [...form.variants];
-                                    nv[vIdx].price = v;
-                                    setForm((f) => ({ ...f, variants: nv }));
-                                  }}
-                                />
-                                <InputField
-                                  label="Your Discount (%)"
-                                  type="number"
-                                  value={variant.discountPercent ?? ""}
-                                  onChange={(v) => {
-                                    const nv = [...form.variants];
-                                    nv[vIdx].discountPercent = v;
-                                    setForm((f) => ({ ...f, variants: nv }));
-                                  }}
-                                  placeholder="0"
-                                />
-                              </div>
+                              <VariantPricingFields
+                                variant={variant}
+                                onUpdate={(field, value) => updateVariantPricing(vIdx, field, value)}
+                                calcOnly={isInstallmentsOnlyMode}
+                              />
                             </div>
                           ) : fieldsLocked && variant.isPartnerOwned ? (
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 pr-8">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-5 pr-8">
                               <InputField
                                 label="Your variant name *"
                                 value={variant.variantName}
@@ -922,36 +981,15 @@ const EditInstallmentPlan = () => {
                                 }}
                                 placeholder="e.g. 12GB / 256GB — your offer"
                               />
-                              <InputField
-                                label="Your Cash Price (₨) *"
-                                type="number"
-                                value={variant.price}
-                                onChange={(v) => {
-                                  const nv = [...form.variants];
-                                  nv[vIdx].price = v;
-                                  setForm((f) => ({ ...f, variants: nv }));
-                                }}
+                              <VariantPricingFields
+                                variant={variant}
+                                onUpdate={(field, value) => updateVariantPricing(vIdx, field, value)}
+                                calcOnly={isInstallmentsOnlyMode}
+                                compact
                               />
-                              <InputField
-                                label="Discount (%)"
-                                type="number"
-                                value={variant.discountPercent ?? ""}
-                                onChange={(v) => {
-                                  const nv = [...form.variants];
-                                  nv[vIdx].discountPercent = v;
-                                  setForm((f) => ({ ...f, variants: nv }));
-                                }}
-                                placeholder="0"
-                              />
-                              <div className="flex flex-col justify-end">
-                                <span className="text-xs text-gray-500">Effective cash price</span>
-                                <span className="text-lg font-bold text-red-600">
-                                  ₨ {getVariantEffectivePrice(variant).toLocaleString()}
-                                </span>
-                              </div>
                             </div>
                           ) : (
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-4 pr-8">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-5 pr-8">
                               <InputField
                                 label="Variant Name *"
                                 value={variant.variantName}
@@ -962,33 +1000,12 @@ const EditInstallmentPlan = () => {
                                 }}
                                 placeholder="e.g. 12GB / 256GB"
                               />
-                              <InputField
-                                label="Cash Price (₨) *"
-                                type="number"
-                                value={variant.price}
-                                onChange={(v) => {
-                                  const nv = [...form.variants];
-                                  nv[vIdx].price = v;
-                                  setForm((f) => ({ ...f, variants: nv }));
-                                }}
+                              <VariantPricingFields
+                                variant={variant}
+                                onUpdate={(field, value) => updateVariantPricing(vIdx, field, value)}
+                                calcOnly={isInstallmentsOnlyMode}
+                                compact
                               />
-                              <InputField
-                                label="Discount (%)"
-                                type="number"
-                                value={variant.discountPercent ?? ""}
-                                onChange={(v) => {
-                                  const nv = [...form.variants];
-                                  nv[vIdx].discountPercent = v;
-                                  setForm((f) => ({ ...f, variants: nv }));
-                                }}
-                                placeholder="0"
-                              />
-                              <div className="flex flex-col justify-end">
-                                <span className="text-xs text-gray-500">Effective cash price</span>
-                                <span className="text-lg font-bold text-red-600">
-                                  ₨ {getVariantEffectivePrice(variant).toLocaleString()}
-                                </span>
-                              </div>
                             </div>
                           )}
                         </div>
@@ -999,10 +1016,55 @@ const EditInstallmentPlan = () => {
               )}
 
               {!showVariantSection && (
-                <InputField label={fieldsLocked ? "Your Cash Price (₨)" : "Cash Price (₨) *"} type="number" value={form.price} onChange={v => updateForm('price', v)} placeholder="Cash price for installment calculations" />
+                <div className="p-4 bg-white border border-gray-200 rounded-xl space-y-4">
+                  <p className="text-sm font-medium text-gray-700">
+                    {isInstallmentsOnlyMode
+                      ? "Pricing for installment calculations (not stored in Only installments mode)"
+                      : fieldsLocked ? "Your product pricing" : "Product pricing"}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <InputField
+                      label="Cash Price (₨) *"
+                      type="number"
+                      value={form.price}
+                      onChange={(v) => updateBasePricing("price", v)}
+                      placeholder="Original cash price"
+                    />
+                    <InputField
+                      label="Discounted Price (₨)"
+                      type="number"
+                      value={form.discountedPrice ?? ""}
+                      onChange={(v) => updateBasePricing("discountedPrice", v)}
+                      placeholder="Sale / offer price"
+                    />
+                    <InputField
+                      label="Discount % (auto)"
+                      type="number"
+                      value={form.discountPercent ?? 0}
+                      readOnly
+                    />
+                    <div className="flex flex-col justify-end">
+                      <span className="text-xs text-gray-500">Effective price for plans</span>
+                      <span className="text-lg font-bold text-red-600">
+                        ₨ {getBaseEffectivePrice(form).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               )}
 
-              {!(savePricingOnly && fieldsLocked) && (
+              {isCashOnlyMode && (
+                <p className="text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                  Ready to save cash prices. Payment plans will not be changed.
+                </p>
+              )}
+              {isInstallmentsOnlyMode && (
+                <p className="text-sm text-violet-800 bg-violet-50 border border-violet-200 rounded-lg px-4 py-3">
+                  Only installment plans will be updated. Cash prices entered above are for calculations only.
+                </p>
+              )}
+
+              {showPaymentPlans && (
               <div className="space-y-6">
                 {form.paymentPlans.map((p, idx) => (
                   <PaymentPlanCard
@@ -1070,8 +1132,12 @@ const EditInstallmentPlan = () => {
               >
                 {loading
                   ? 'Updating...'
-                  : savePricingOnly && isAttachedProduct
+                  : isInstallmentsOnlyMode
+                    ? 'Save installment plans only'
+                    : isCashOnlyMode && isAttachedProduct
                     ? 'Save your pricing'
+                    : isCashOnlyMode
+                    ? 'Save cash prices'
                     : 'Update Installment Plan'}
               </button>
             )}
@@ -1140,7 +1206,7 @@ const PaymentPlanCard = ({
   const planCashPrice =
     plan.variantIndex !== null && plan.variantIndex !== undefined && form.variants[plan.variantIndex]
       ? getVariantEffectivePrice(form.variants[plan.variantIndex])
-      : deriveProductPrice(form.variants, form.price);
+      : deriveProductPrice(form.variants, form.price, form);
 
   return (
     <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-200 relative">
@@ -1279,6 +1345,37 @@ const SummaryItem = ({ label, value, highlight }) => (
     </p>
   </div>
 );
+
+const VariantPricingFields = ({ variant, onUpdate, calcOnly = false, compact = false }) => {
+  const cashLabel = calcOnly ? "Cash Price (calc) *" : "Cash Price (₨) *";
+  const discLabel = calcOnly ? "Discounted Price (calc)" : "Discounted Price (₨)";
+
+  if (compact) {
+    return (
+      <>
+        <InputField label={cashLabel} type="number" value={variant.price} onChange={(v) => onUpdate("price", v)} />
+        <InputField label={discLabel} type="number" value={variant.discountedPrice ?? ""} onChange={(v) => onUpdate("discountedPrice", v)} placeholder="Same as cash if no discount" />
+        <InputField label="Discount % (auto)" type="number" value={variant.discountPercent ?? 0} readOnly />
+        <div className="flex flex-col justify-end">
+          <span className="text-xs text-gray-500">Effective price</span>
+          <span className="text-lg font-bold text-red-600">₨ {getVariantEffectivePrice(variant).toLocaleString()}</span>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <InputField label={cashLabel} type="number" value={variant.price} onChange={(v) => onUpdate("price", v)} />
+      <InputField label={discLabel} type="number" value={variant.discountedPrice ?? ""} onChange={(v) => onUpdate("discountedPrice", v)} placeholder="Same as cash if no discount" />
+      <InputField label="Discount % (auto)" type="number" value={variant.discountPercent ?? 0} readOnly />
+      <div className="flex flex-col justify-end">
+        <span className="text-xs text-gray-500">Effective price for plans</span>
+        <span className="text-lg font-bold text-red-600">₨ {getVariantEffectivePrice(variant).toLocaleString()}</span>
+      </div>
+    </div>
+  );
+};
 
 export default EditInstallmentPlan;
 

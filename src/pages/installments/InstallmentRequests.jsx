@@ -546,7 +546,7 @@ const InstallmentRequests = () => {
                       </div>
                     )}
 
-                    {/* Plan Information — same fields as client dashboard, no images */}
+                    {/* Plan Information  same fields as client dashboard, no images */}
                     {(getStoredPlanInfo(selectedRequest) || catalogPlan || selectedRequest.installmentPlanId) && (() => {
                       const plan = resolveAppliedPlanDisplay(selectedRequest, catalogPlan);
                       const fmt = (n) =>

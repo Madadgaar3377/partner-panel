@@ -229,7 +229,7 @@ const InstallmentsList = () => {
                           <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
                             isOwner ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'
                           }`}>
-                            {isOwner ? 'Your listing' : 'Shared — your plans'}
+                            {isOwner ? 'Your listing' : 'Shared  your plans'}
                           </span>
                           <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
                             installment.status === 'active' || installment.status === 'approved'

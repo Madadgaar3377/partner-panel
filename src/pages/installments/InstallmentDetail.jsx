@@ -319,7 +319,7 @@ const InstallmentDetail = () => {
             {!isOwner && (
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
                 <strong>Shared product:</strong> Created by {installment.ownerCompanyName || installment.companyName || 'another partner'}.
-                You can add, edit, or delete <strong>only your payment plans</strong> — not the whole listing.
+                You can add, edit, or delete <strong>only your payment plans</strong>  not the whole listing.
               </div>
             )}
 

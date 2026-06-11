@@ -103,7 +103,7 @@ const AddAgents = () => {
               Add Agents
             </h1>
             <p className="text-gray-600 mt-1">Select agents to assign to your orders. New orders will be auto-assigned to one of them.</p>
-            <p className="text-sm text-gray-500 mt-1">You can add as many agents as you need — 2, 5, 10 or more. There is no limit.</p>
+            <p className="text-sm text-gray-500 mt-1">You can add as many agents as you need  2, 5, 10 or more. There is no limit.</p>
           </div>
         </div>
 
@@ -144,7 +144,7 @@ const AddAgents = () => {
                   className="bg-white rounded-xl shadow border border-gray-100 p-4 flex flex-wrap items-center justify-between gap-4"
                 >
                   <div>
-                    <p className="font-semibold text-gray-900">{agent.name || '—'}</p>
+                    <p className="font-semibold text-gray-900">{agent.name || ''}</p>
                     {agent.email && (
                       <p className="text-sm text-gray-600 flex items-center gap-1">
                         <Mail className="w-4 h-4" /> {agent.email}

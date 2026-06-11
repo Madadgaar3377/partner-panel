@@ -852,10 +852,10 @@ const EditInstallmentPlan = () => {
                 <p className="text-xs text-gray-600">
                   {isCashOnlyMode
                     ? fieldsLocked
-                      ? "Update your catalog variant prices or your own variants — payment plans stay unchanged."
+                      ? "Update your catalog variant prices or your own variants  payment plans stay unchanged."
                       : "Save variant cash prices only; installment plans stay unchanged."
                     : isInstallmentsOnlyMode
-                    ? "Enter cash price for installment calculations only — stored cash prices on the product will not be updated."
+                    ? "Enter cash price for installment calculations only  stored cash prices on the product will not be updated."
                     : "Save cash prices and your payment plan changes together."}
                 </p>
               </div>
@@ -869,7 +869,7 @@ const EditInstallmentPlan = () => {
                           <h3 className="text-lg font-bold text-gray-800">Your pricing on this product</h3>
                           <p className="text-sm text-gray-600 mt-1">
                             {isInstallmentsOnlyMode
-                              ? "Cash & discounted price for calculations — not saved in Only installments mode."
+                              ? "Cash & discounted price for calculations  not saved in Only installments mode."
                               : "Set your cash price on catalog variants, or add your own variant."}
                           </p>
                         </>
@@ -953,7 +953,7 @@ const EditInstallmentPlan = () => {
                           {fieldsLocked && variant.isCatalogVariant ? (
                             <div className="space-y-4">
                               <div className="space-y-1">
-                                <span className="text-xs font-medium text-gray-500">Catalog variant (listing — name not editable)</span>
+                                <span className="text-xs font-medium text-gray-500">Catalog variant (listing  name not editable)</span>
                                 <p className="text-base font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 cursor-default">
                                   {variant.variantName || `Variant ${vIdx + 1}`}
                                   {variant.listingPrice != null && (
@@ -979,7 +979,7 @@ const EditInstallmentPlan = () => {
                                   nv[vIdx].variantName = v;
                                   setForm((f) => ({ ...f, variants: nv }));
                                 }}
-                                placeholder="e.g. 12GB / 256GB — your offer"
+                                placeholder="e.g. 12GB / 256GB  your offer"
                               />
                               <VariantPricingFields
                                 variant={variant}
@@ -1239,7 +1239,7 @@ const PaymentPlanCard = ({
             required
           >
             {(plan.variantIndex === null || plan.variantIndex === undefined) && (
-              <option value="" disabled>— Select variant —</option>
+              <option value="" disabled> Select variant </option>
             )}
             {form.variants.map((v, vIdx) => (
               <option key={vIdx} value={vIdx}>{v.variantName} (₨ {getVariantEffectivePrice(v).toLocaleString()})</option>

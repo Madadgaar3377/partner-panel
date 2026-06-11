@@ -122,7 +122,7 @@ export const deriveProductPrice = (variants, fallback = 0, formForBase = null) =
   return Number(fallback) || 0;
 };
 
-/** Variants payload for create — strips cash prices when saving installments only */
+/** Variants payload for create  strips cash prices when saving installments only */
 export const mapVariantsForCreatePayload = (variants, activePlans, options = {}) => {
   const { installmentsOnly, planPayloadWithFinance, getVariantCashForPlan } = options;
 
@@ -515,7 +515,7 @@ export const buildPartnerCatalogPricingPatch = (form, editorUserId) => {
   };
 };
 
-/** Save cash prices (and optional partner-only variants) on a shared catalog product — no payment plans required. */
+/** Save cash prices (and optional partner-only variants) on a shared catalog product  no payment plans required. */
 export const submitPartnerCatalogPricing = async ({
   installmentId,
   form,

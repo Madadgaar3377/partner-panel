@@ -10,7 +10,7 @@ export const getInstallmentProductLabel = (p) => {
   const city = p.city ? ` · ${p.city}` : '';
   const price =
     p.price != null && p.price !== ''
-      ? ` — PKR ${Number(p.price).toLocaleString()}`
+      ? `  PKR ${Number(p.price).toLocaleString()}`
       : '';
   const id = getInstallmentProductId(p);
   return `${name}${brand}${city}${price}${id ? ` (${id})` : ''}`;

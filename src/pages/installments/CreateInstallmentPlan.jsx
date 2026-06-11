@@ -686,7 +686,7 @@ const CreateInstallmentPlan = () => {
                                         products={existingProducts}
                                         value={selectedProductId}
                                         onChange={handleSelectExistingProduct}
-                                        placeholder="Type to search — e.g. Samsung, Lahore..."
+                                        placeholder="Type to search  e.g. Samsung, Lahore..."
                                         createNewLabel="-- Create new product from scratch --"
                                     />
                                 </div>
@@ -1059,10 +1059,10 @@ const CreateInstallmentPlan = () => {
                                 <p className="text-xs text-gray-600">
                                     {isCashOnlyMode
                                         ? selectedProductId
-                                            ? "Set your cash price on catalog variants or add your own variant — no payment plans required."
+                                            ? "Set your cash price on catalog variants or add your own variant  no payment plans required."
                                             : "Save variant cash prices now; add installment plans later from the list."
                                         : isInstallmentsOnlyMode
-                                        ? "Enter cash price for installment calculations only — cash prices will not be stored on the product."
+                                        ? "Enter cash price for installment calculations only  cash prices will not be stored on the product."
                                         : "Save cash prices and include payment plans in this submission."}
                                 </p>
                             </div>
@@ -1076,7 +1076,7 @@ const CreateInstallmentPlan = () => {
                                                     <h3 className="text-lg font-bold text-gray-800">Your pricing on this product</h3>
                                                     <p className="text-sm text-gray-600 mt-1">
                                                         {isInstallmentsOnlyMode
-                                                            ? "Enter cash & discounted price for calculations — not saved unless you choose Cash price or Cash + installments."
+                                                            ? "Enter cash & discounted price for calculations  not saved unless you choose Cash price or Cash + installments."
                                                             : "Set your cash price on catalog variants, or add your own variant."}
                                                     </p>
                                                 </>
@@ -1159,7 +1159,7 @@ const CreateInstallmentPlan = () => {
                                                     {selectedProductId && variant.isCatalogVariant ? (
                                                         <div className="space-y-4">
                                                             <div className="space-y-1">
-                                                                <span className="text-xs font-medium text-gray-500">Catalog variant (listing — name not editable)</span>
+                                                                <span className="text-xs font-medium text-gray-500">Catalog variant (listing  name not editable)</span>
                                                                 <p className="text-base font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 cursor-default">
                                                                     {variant.variantName || `Variant ${vIdx + 1}`}
                                                                     {variant.listingPrice != null && (
@@ -1177,7 +1177,7 @@ const CreateInstallmentPlan = () => {
                                                         </div>
                                                     ) : selectedProductId && variant.isPartnerOwned ? (
                                                         <div className="grid grid-cols-1 gap-4 md:grid-cols-5 pr-8">
-                                                            <InputField label="Your variant name *" value={variant.variantName} onChange={v => { const nv = [...form.variants]; nv[vIdx].variantName = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="e.g. 12GB / 256GB — your offer" />
+                                                            <InputField label="Your variant name *" value={variant.variantName} onChange={v => { const nv = [...form.variants]; nv[vIdx].variantName = v; setForm(f => ({ ...f, variants: nv })); }} placeholder="e.g. 12GB / 256GB  your offer" />
                                                             <VariantPricingFields
                                                                 variant={variant}
                                                                 onUpdate={(field, value) => updateVariantPricing(vIdx, field, value)}
@@ -1249,7 +1249,7 @@ const CreateInstallmentPlan = () => {
 
                             {showPaymentPlans && (
                             <div className="space-y-6">
-                                {/* Render Existing Plans (Read-Only) — your company */}
+                                {/* Render Existing Plans (Read-Only)  your company */}
                                 {existingPlans.map((p, idx) => (
                                     <div key={`ext-${idx}`} className="bg-gray-100/50 p-8 rounded-[2.5rem] border border-gray-200 relative group animate-in slide-in-from-right-4 duration-300 opacity-80">
                                         <div className="absolute top-4 right-6 bg-gray-200 text-gray-500 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">Existing Plan (Read-Only)</div>
@@ -1468,7 +1468,7 @@ const PaymentPlanCard = ({
                         required
                     >
                         {(plan.variantIndex === null || plan.variantIndex === undefined) && (
-                            <option value="" disabled>— Select variant —</option>
+                            <option value="" disabled> Select variant </option>
                         )}
                         {form.variants.map((v, vIdx) => (
                             <option key={vIdx} value={vIdx}>{v.variantName} (₨ {getVariantEffectivePrice(v).toLocaleString()})</option>

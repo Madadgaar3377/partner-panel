@@ -5,12 +5,12 @@ const KEYS_BASE = `${baseApi}/v1/partner/keys`;
 const INTEGRATION_BASE = `${baseApi}/v1/partner`;
 
 export const SCOPE_OPTIONS = [
-  { id: 'installments:read', label: 'Installments — read', description: 'List and view your installment products' },
-  { id: 'installments:write', label: 'Installments — write', description: 'Create, update, and delete products' },
-  { id: 'applications:read', label: 'Applications — read', description: 'View incoming customer requests' },
-  { id: 'applications:write', label: 'Applications — write', description: 'Approve, reject, or update request status' },
-  { id: 'dashboard:read', label: 'Dashboard — read', description: 'Fetch dashboard statistics' },
-  { id: 'profile:read', label: 'Profile — read', description: 'Verify API key and read partner profile' },
+  { id: 'installments:read', label: 'Installments  read', description: 'List and view your installment products' },
+  { id: 'installments:write', label: 'Installments  write', description: 'Create, update, and delete products' },
+  { id: 'applications:read', label: 'Applications  read', description: 'View incoming customer requests' },
+  { id: 'applications:write', label: 'Applications  write', description: 'Approve, reject, or update request status' },
+  { id: 'dashboard:read', label: 'Dashboard  read', description: 'Fetch dashboard statistics' },
+  { id: 'profile:read', label: 'Profile  read', description: 'Verify API key and read partner profile' },
 ];
 
 export const REQUIRED_SCOPES = ['profile:read'];
@@ -69,7 +69,7 @@ export async function testPartnerApiKey(apiKey) {
 export function formatRelativeTime(dateStr) {
   if (!dateStr) return 'Never';
   const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '';
 
   const diffMs = Date.now() - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);

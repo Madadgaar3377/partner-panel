@@ -76,7 +76,7 @@ const MyAgents = () => {
             <p className="text-gray-600 mt-1">
               Orders from your products will be auto-assigned to one of these agents. If you have none, orders go to other available agents.
             </p>
-            <p className="text-sm text-gray-500 mt-1">You can add as many agents as you need — no limit.</p>
+            <p className="text-sm text-gray-500 mt-1">You can add as many agents as you need  no limit.</p>
           </div>
           <button
             onClick={() => navigate('/agents/add')}
@@ -112,7 +112,7 @@ const MyAgents = () => {
                   className="bg-white rounded-xl shadow border border-gray-100 p-4 flex flex-wrap items-center justify-between gap-4"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900">{agent.name || '—'}</p>
+                    <p className="font-semibold text-gray-900">{agent.name || ''}</p>
                     {agent.email && (
                       <p className="text-sm text-gray-600 flex items-center gap-1 mt-0.5">
                         <Mail className="w-4 h-4" /> {agent.email}

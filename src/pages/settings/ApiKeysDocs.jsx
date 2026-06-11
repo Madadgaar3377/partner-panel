@@ -123,7 +123,7 @@ MADADGAAR_API_BASE=${INTEGRATION_BASE}`;
           Partner API Documentation
         </h1>
         <p className="text-gray-600 mb-8">
-          Same installment logic as the partner panel — owner vs contributor rules, payment plan merge, and cache invalidation.
+          Same installment logic as the partner panel  owner vs contributor rules, payment plan merge, and cache invalidation.
         </p>
 
         <section id="create-key" className="bg-white rounded-2xl shadow border border-gray-100 p-6 mb-6">
@@ -143,7 +143,7 @@ MADADGAAR_API_BASE=${INTEGRATION_BASE}`;
           <h2 className="text-lg font-bold text-gray-900 mb-4">2. Installments API</h2>
           <p className="text-sm text-gray-600 mb-4">
             Base: <code className="bg-gray-100 px-1 rounded">{INTEGRATION_BASE}/installments</code>
-            — partnerId is auto-filled from your API key (never send another partner&apos;s userId).
+             partnerId is auto-filled from your API key (never send another partner&apos;s userId).
           </p>
 
           <div className="overflow-x-auto mb-6">

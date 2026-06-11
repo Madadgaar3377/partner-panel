@@ -122,7 +122,7 @@ const ApiKeys = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      alert('Copy failed — please select and copy manually');
+      alert('Copy failed  please select and copy manually');
     }
   };
 
@@ -181,7 +181,7 @@ const ApiKeys = () => {
         <div className="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl">
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
           <p className="text-sm">
-            Copy your key when it is created — it will not be shown again. Store it securely in your server environment (e.g. <code className="bg-amber-100 px-1 rounded">MADADGAAR_API_KEY</code>).
+            Copy your key when created, or find it in the confirmation email sent to your partner address. Save for lifetime use in your server environment (e.g. <code className="bg-amber-100 px-1 rounded">MADADGAAR_API_KEY</code>).
           </p>
         </div>
 
@@ -369,7 +369,7 @@ const ApiKeys = () => {
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                 API key created
               </h2>
-              <p className="text-sm text-amber-700 mt-1">Copy this key now — it will not be shown again.</p>
+              <p className="text-sm text-amber-700 mt-1">Copy this key now or check your email — the full key is included for lifetime reference.</p>
             </div>
             <div className="p-6 space-y-4">
               <div>
@@ -429,7 +429,7 @@ const ApiKeys = () => {
                 }}
                 className="w-full px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700"
               >
-                Done — I saved my key
+                Done  I saved my key
               </button>
             </div>
           </div>

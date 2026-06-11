@@ -8,12 +8,16 @@ import {
   DollarSign,
   MapPin,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Key,
+  BookOpen,
+  ExternalLink,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { PageLoader } from '../components/Loader';
 import baseApi from '../constants/apiUrl';
+import { DOCS_SITE } from '../constants/siteUrls';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -104,6 +108,35 @@ const Dashboard = () => {
             <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
+
+        <div className="mb-8 rounded-2xl border border-red-100 bg-white shadow-md p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">Connect your systems via API</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Generate API keys, sync installments, and integrate with your website or ERP.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/settings/api-keys')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors shadow-md"
+            >
+              <Key className="w-4 h-4" />
+              API Keys
+            </button>
+            <a
+              href={DOCS_SITE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 bg-white text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              <BookOpen className="w-4 h-4" />
+              Documentation
+              <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+            </a>
+          </div>
+        </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

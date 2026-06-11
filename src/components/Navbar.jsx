@@ -12,10 +12,13 @@ import {
   Menu,
   X,
   ChevronDown,
-  Key
+  Key,
+  BookOpen,
+  ExternalLink,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getUserData, clearUserSession } from '../utils/auth';
+import { DOCS_SITE } from '../constants/siteUrls';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -98,8 +101,25 @@ const Navbar = () => {
     color: 'gray',
     items: [
       { label: 'API Keys', path: '/settings/api-keys' },
+      { label: 'API Documentation', href: DOCS_SITE, external: true },
       { label: 'Edit Profile', path: '/profile/edit' },
     ],
+  };
+
+  const openExternal = (href) => {
+    window.open(href, '_blank', 'noopener,noreferrer');
+    setOpenDropdown(null);
+    setMobileMenuOpen(false);
+  };
+
+  const handleMenuItemClick = (item) => {
+    if (item.external && item.href) {
+      openExternal(item.href);
+      return;
+    }
+    navigate(item.path);
+    setOpenDropdown(null);
+    setMobileMenuOpen(false);
   };
 
   // Agents menu: all partners can link their own agents for auto-assignment
@@ -159,7 +179,9 @@ const Navbar = () => {
             {/* Dynamic Access Menus */}
             {availableMenus.map((menu) => {
               const Icon = menu.icon;
-              const isMenuActive = menu.items.some(item => location.pathname.startsWith(item.path.split('/')[1]));
+              const isMenuActive = menu.items.some(
+                (item) => item.path && location.pathname.startsWith(`/${item.path.split('/')[1]}`)
+              );
               
               return (
                 <div key={menu.label} className="relative">
@@ -183,16 +205,14 @@ const Navbar = () => {
                     <div className="absolute top-full left-0 mt-2 w-52 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2">
                       {menu.items.map((item) => (
                         <button
-                          key={item.path}
-                          onClick={() => {
-                            navigate(item.path);
-                            setOpenDropdown(null);
-                          }}
-                          className={`w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors ${
-                            isActive(item.path) ? 'bg-red-50 text-red-600' : 'text-gray-700'
+                          key={item.path || item.href}
+                          onClick={() => handleMenuItemClick(item)}
+                          className={`w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 ${
+                            item.path && isActive(item.path) ? 'bg-red-50 text-red-600' : 'text-gray-700'
                           }`}
                         >
-                          {item.label}
+                          <span>{item.label}</span>
+                          {item.external && <ExternalLink className="w-3.5 h-3.5 text-gray-400 shrink-0" />}
                         </button>
                       ))}
                     </div>
@@ -204,6 +224,17 @@ const Navbar = () => {
 
           {/* User Menu */}
           <div className="hidden lg:flex items-center gap-3">
+            <a
+              href={DOCS_SITE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+              title="Partner API documentation"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span className="font-semibold text-sm">API Docs</span>
+              <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+            </a>
             <div 
               className="flex items-center gap-3 px-3 py-2 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
               onClick={() => navigate('/profile')}
@@ -283,17 +314,15 @@ const Navbar = () => {
                   </div>
                   {menu.items.map((item) => (
                     <button
-                      key={item.path}
-                      onClick={() => {
-                        navigate(item.path);
-                        setMobileMenuOpen(false);
-                      }}
+                      key={item.path || item.href}
+                      onClick={() => handleMenuItemClick(item)}
                       className={`w-full flex items-center gap-3 px-4 py-2 pl-8 transition-colors ${
-                        isActive(item.path) ? 'bg-red-50 text-red-600' : 'text-gray-700'
+                        item.path && isActive(item.path) ? 'bg-red-50 text-red-600' : 'text-gray-700'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
-                      <span>{item.label}</span>
+                      <span className="flex-1 text-left">{item.label}</span>
+                      {item.external && <ExternalLink className="w-3.5 h-3.5 text-gray-400" />}
                     </button>
                   ))}
                 </div>
@@ -321,6 +350,14 @@ const Navbar = () => {
               >
                 <Key className="w-5 h-5" />
                 <span className="font-medium">API Keys</span>
+              </button>
+              <button
+                onClick={() => openExternal(DOCS_SITE)}
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <BookOpen className="w-5 h-5" />
+                <span className="font-medium flex-1 text-left">API Documentation</span>
+                <ExternalLink className="w-4 h-4 text-gray-400" />
               </button>
               <button
                 onClick={() => {

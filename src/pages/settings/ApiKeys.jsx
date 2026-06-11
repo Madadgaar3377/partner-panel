@@ -11,8 +11,10 @@ import {
   Zap,
   X,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
+import { DOCS_SITE } from '../../constants/siteUrls';
 import { PageLoader } from '../../components/Loader';
 import {
   listPartnerApiKeys,
@@ -160,12 +162,22 @@ const ApiKeys = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <a
+              href={DOCS_SITE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 shadow-md transition-colors"
+            >
+              <BookOpen className="w-4 h-4" />
+              API Documentation
+              <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+            </a>
             <Link
               to="/settings/api-keys/docs"
               className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 bg-white text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
             >
-              <BookOpen className="w-4 h-4" />
-              Documentation
+              <Zap className="w-4 h-4" />
+              Quick test
             </Link>
             <button
               type="button"

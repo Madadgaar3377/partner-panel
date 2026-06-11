@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Copy, CheckCircle2, ArrowLeft, Key, Zap, Loader2 } from 'lucide-react';
+import { BookOpen, Copy, CheckCircle2, ArrowLeft, Key, Zap, Loader2, ExternalLink } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import { getIntegrationBaseUrl, integrationGet } from '../../utils/partnerApiKeys';
+import { DOCS_SITE } from '../../constants/siteUrls';
 
 const INTEGRATION_BASE = getIntegrationBaseUrl();
 
@@ -118,12 +119,32 @@ MADADGAAR_API_BASE=${INTEGRATION_BASE}`;
           Back to API Keys
         </Link>
 
+        <div className="mb-6 rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-red-800 mb-1">Full documentation</p>
+            <p className="text-sm text-gray-600">
+              Complete API reference, code examples, field tables, and Test now buttons live at{' '}
+              <span className="font-mono text-red-700">{DOCS_SITE.replace('https://', '')}</span>
+            </p>
+          </div>
+          <a
+            href={DOCS_SITE}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 shadow-md transition-colors shrink-0"
+          >
+            <BookOpen className="w-4 h-4" />
+            Open docs site
+            <ExternalLink className="w-4 h-4 opacity-80" />
+          </a>
+        </div>
+
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 mb-2">
-          <BookOpen className="w-7 h-7 text-red-600" />
-          Partner API Documentation
+          <Zap className="w-7 h-7 text-red-600" />
+          Quick reference & live test
         </h1>
         <p className="text-gray-600 mb-8">
-          Same installment logic as the partner panel  owner vs contributor rules, payment plan merge, and cache invalidation.
+          In-panel summary for fast testing. For complete guides (variants, finance, applications), use the docs site above.
         </p>
 
         <section id="create-key" className="bg-white rounded-2xl shadow border border-gray-100 p-6 mb-6">

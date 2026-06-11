@@ -85,3 +85,30 @@ export function formatRelativeTime(dateStr) {
 export function getIntegrationBaseUrl() {
   return INTEGRATION_BASE;
 }
+
+function apiKeyHeaders(apiKey) {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  };
+}
+
+export async function integrationGet(apiKey, path) {
+  const res = await fetch(`${INTEGRATION_BASE}${path}`, {
+    headers: apiKeyHeaders(apiKey),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+  return data;
+}
+
+export async function integrationPost(apiKey, path, body) {
+  const res = await fetch(`${INTEGRATION_BASE}${path}`, {
+    method: 'POST',
+    headers: apiKeyHeaders(apiKey),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+  return data;
+}

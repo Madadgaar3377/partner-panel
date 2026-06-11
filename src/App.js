@@ -47,6 +47,10 @@ import CommissionManagement from './pages/commission/CommissionManagement';
 import MyAgents from './pages/agents/MyAgents';
 import AddAgents from './pages/agents/AddAgents';
 
+// Settings — API Keys
+import ApiKeys from './pages/settings/ApiKeys';
+import ApiKeysDocs from './pages/settings/ApiKeysDocs';
+
 // Route-based SEO (title + meta per path)
 const getRouteSEO = (pathname) => {
   const base = { noIndex: true };
@@ -64,6 +68,7 @@ const getRouteSEO = (pathname) => {
   if (pathname === '/insurance' || pathname.startsWith('/insurance')) return { ...base, title: 'Insurance', description: 'Manage insurance plans and applications.', canonicalPath: pathname };
   if (pathname.startsWith('/commission')) return { ...base, title: 'Commission', description: 'Commission configuration and management.', canonicalPath: pathname };
   if (pathname === '/agents' || pathname.startsWith('/agents')) return { ...base, title: 'Agents', description: 'Manage linked agents and assignments.', canonicalPath: pathname };
+  if (pathname.startsWith('/settings/api-keys')) return { ...base, title: 'API Keys', description: 'Manage partner API keys for system integrations.', canonicalPath: pathname };
   return { ...base, title: 'Partner Portal', description: 'Madadgaar Partner Portal.', canonicalPath: pathname || '/' };
 };
 
@@ -428,6 +433,24 @@ function App() {
           element={
             <ProtectedRoute>
               <AddAgents />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Settings — API Keys */}
+        <Route
+          path="/settings/api-keys"
+          element={
+            <ProtectedRoute>
+              <ApiKeys />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/api-keys/docs"
+          element={
+            <ProtectedRoute>
+              <ApiKeysDocs />
             </ProtectedRoute>
           }
         />

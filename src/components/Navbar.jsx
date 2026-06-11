@@ -11,7 +11,8 @@ import {
   Shield,
   Menu,
   X,
-  ChevronDown
+  ChevronDown,
+  Key
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getUserData, clearUserSession } from '../utils/auth';
@@ -91,6 +92,16 @@ const Navbar = () => {
     }
   };
 
+  const settingsMenu = {
+    icon: Settings,
+    label: 'Settings',
+    color: 'gray',
+    items: [
+      { label: 'API Keys', path: '/settings/api-keys' },
+      { label: 'Edit Profile', path: '/profile/edit' },
+    ],
+  };
+
   // Agents menu: all partners can link their own agents for auto-assignment
   const agentsMenu = {
     icon: Users,
@@ -105,7 +116,8 @@ const Navbar = () => {
   // Get available menus based on user access + always show Agents
   const availableMenus = [
     ...(userData.userAccess?.map(access => accessMenus[access]).filter(Boolean) || []),
-    agentsMenu
+    agentsMenu,
+    settingsMenu,
   ];
 
   const toggleDropdown = (label) => {
@@ -208,14 +220,6 @@ const Navbar = () => {
             </div>
             
             <button
-              onClick={() => navigate('/profile/edit')}
-              className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-              title="Edit Profile"
-            >
-              <Settings className="w-5 h-5 text-gray-600" />
-            </button>
-            
-            <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-md"
             >
@@ -307,6 +311,16 @@ const Navbar = () => {
               >
                 <User className="w-5 h-5" />
                 <span className="font-medium">My Profile</span>
+              </button>
+              <button
+                onClick={() => {
+                  navigate('/settings/api-keys');
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                <Key className="w-5 h-5" />
+                <span className="font-medium">API Keys</span>
               </button>
               <button
                 onClick={() => {

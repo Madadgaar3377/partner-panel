@@ -381,7 +381,7 @@ const ApiKeys = () => {
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                 API key created
               </h2>
-              <p className="text-sm text-amber-700 mt-1">Copy this key now or check your email — the full key is included for lifetime reference.</p>
+              <p className="text-sm text-amber-700 mt-1">Copy this key now or check your email  the full key is included for lifetime reference.</p>
             </div>
             <div className="p-6 space-y-4">
               <div>

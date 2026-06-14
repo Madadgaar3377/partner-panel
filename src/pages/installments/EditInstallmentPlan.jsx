@@ -6,32 +6,27 @@ import {
   X,
   Package,
   Image as ImageIcon,
-  Calculator
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 import {
-  DEFAULT_INSTALLMENT_PLAN,
   STEP4_SAVE_MODES,
   getVariantEffectivePrice,
   getBaseEffectivePrice,
   deriveProductPrice,
   mapInstallmentPlanToForm,
   submitInstallmentPlanUpdate,
-  deletePartnerPaymentPlanApi,
   applyVariantPricingUpdate,
   applyBasePricingUpdate,
+  recalculatePaymentPlan,
 } from '../../utils/installmentPartnerPlans';
 import {
   PartnerStep4Tabs,
   ProductFinancePanel,
-  PlanFinanceSection,
-  AddPlanButton,
 } from '../../components/installment/InstallmentFinanceUI';
-
-const defaultPlan = DEFAULT_INSTALLMENT_PLAN;
+import Step4PlansBuilder from '../../components/installment/Step4PlansBuilder';
 
 const EditInstallmentPlan = () => {
   const navigate = useNavigate();
@@ -68,7 +63,7 @@ const EditInstallmentPlan = () => {
     customCategory: "",
     status: "pending",
     productImages: [],
-    paymentPlans: [{ ...defaultPlan }],
+    paymentPlans: [],
     productSpecifications: {
       category: "",
       subCategory: "",
@@ -206,65 +201,11 @@ const EditInstallmentPlan = () => {
   };
 
   // --- Calculation Logic ---
-  const amortizedMonthlyPayment = (principal, annualInterestPercent, months) => {
-    if (!months || months <= 0) return 0;
-    const r = Number(annualInterestPercent) / 100 / 12;
-    if (!r) return principal / months;
-    const monthly = (principal * r) / (1 - Math.pow(1 + r, -months));
-    return monthly;
-  };
-
   const recalcPlan = (index) => {
     setForm(f => {
       if (!f.paymentPlans || !f.paymentPlans[index]) return f;
       const pp = [...f.paymentPlans];
-      const p = { ...pp[index] };
-
-      let cashPrice = 0;
-      if (p.variantIndex !== undefined && p.variantIndex !== null && p.variantIndex !== -1 && f.variants?.[p.variantIndex]) {
-        cashPrice = getVariantEffectivePrice(f.variants[p.variantIndex]);
-      } else {
-        cashPrice = deriveProductPrice(f.variants, f.price, f);
-      }
-
-      const downPayment = Number(p.downPayment) || 0;
-      const financedAmount = Math.max(0, cashPrice - downPayment);
-      const months = parseInt(p.tenureMonths) || 0;
-      const isIslamic = p.interestType === "Profit-Based (Islamic/Shariah)";
-      const isReducing = p.interestType === "Reducing Balance";
-
-      let monthly = 0;
-      let totalPayable = 0;
-      let totalMarkup = 0;
-      let rate = Number(p.interestRatePercent) || 0;
-
-      if (isIslamic) {
-        totalMarkup = Number(p.markup) || 0;
-        rate = cashPrice > 0 ? (totalMarkup / cashPrice) * 100 : 0;
-        totalPayable = financedAmount + totalMarkup;
-        monthly = months > 0 ? totalPayable / months : 0;
-      } else if (isReducing) {
-        monthly = amortizedMonthlyPayment(financedAmount, rate, months);
-        totalPayable = monthly * months;
-        totalMarkup = Math.max(0, totalPayable - financedAmount);
-      } else {
-        totalMarkup = financedAmount * (rate / 100) * (months / 12);
-        totalPayable = financedAmount + totalMarkup;
-        monthly = months > 0 ? totalPayable / months : 0;
-      }
-
-      const totalCostToCustomer = cashPrice + totalMarkup;
-
-      pp[index] = {
-        ...p,
-        interestRatePercent: Number(rate.toFixed(2)),
-        markup: Number(totalMarkup.toFixed(2)),
-        monthlyInstallment: Number(monthly.toFixed(2)),
-        installmentPrice: Number(totalPayable.toFixed(2)),
-        totalInterest: Number(totalMarkup.toFixed(2)),
-        totalCostToCustomer: Number(totalCostToCustomer.toFixed(2)),
-      };
-
+      pp[index] = recalculatePaymentPlan(pp[index], f);
       return { ...f, paymentPlans: pp };
     });
   };
@@ -274,7 +215,7 @@ const EditInstallmentPlan = () => {
       form.paymentPlans.forEach((_, idx) => recalcPlan(idx));
     }
     // eslint-disable-next-line
-  }, [form.price, form.variants]);
+  }, [form.price, form.variants, form.discountedPrice, form.discountPercent]);
 
   // --- Image Handling ---
   const handleFilesChange = (e) => {
@@ -1065,36 +1006,12 @@ const EditInstallmentPlan = () => {
               )}
 
               {showPaymentPlans && (
-              <div className="space-y-6">
-                {form.paymentPlans.map((p, idx) => (
-                  <PaymentPlanCard
-                    key={p._id || idx}
-                    plan={p}
-                    index={idx}
-                    form={form}
-                    setForm={setForm}
-                    recalcPlan={recalcPlan}
-                    canRemove={form.paymentPlans.length > 1}
-                    fieldsLocked={fieldsLocked}
-                    productId={id}
-                  />
-                ))}
-                <AddPlanButton
-                  onClick={() =>
-                    setForm((f) => ({
-                      ...f,
-                      paymentPlans: [
-                        ...f.paymentPlans,
-                        {
-                          ...defaultPlan,
-                          variantIndex: f.variants.length > 0 ? 0 : null,
-                        },
-                      ],
-                    }))
-                  }
-                  className="mt-2"
-                />
-              </div>
+              <Step4PlansBuilder
+                form={form}
+                setForm={setForm}
+                productId={id}
+                showVariantHint={showVariantSection && form.variants.length > 0}
+              />
               )}
               </>
               )}
@@ -1166,183 +1083,6 @@ const InputField = ({ label, value, onChange, type = "text", placeholder = "", r
         readOnly ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : 'bg-white'
       }`}
     />
-  </div>
-);
-
-// Payment Plan Card Component
-const PaymentPlanCard = ({
-  plan,
-  index,
-  form,
-  setForm,
-  recalcPlan,
-  canRemove,
-  fieldsLocked,
-  productId,
-}) => {
-  const updatePlan = (field, value) => {
-    const pp = [...form.paymentPlans];
-    pp[index][field] = value;
-    setForm(f => ({ ...f, paymentPlans: pp }));
-    setTimeout(() => recalcPlan(index), 0);
-  };
-
-  const handleRemove = async () => {
-    if (!window.confirm('Remove this payment plan?')) return;
-    if (plan._id && productId) {
-      try {
-        await deletePartnerPaymentPlanApi(productId, plan._id);
-      } catch (e) {
-        alert(e.message || 'Failed to delete plan');
-        return;
-      }
-    }
-    setForm((f) => ({
-      ...f,
-      paymentPlans: f.paymentPlans.filter((_, i) => i !== index),
-    }));
-  };
-
-  const planCashPrice =
-    plan.variantIndex !== null && plan.variantIndex !== undefined && form.variants[plan.variantIndex]
-      ? getVariantEffectivePrice(form.variants[plan.variantIndex])
-      : deriveProductPrice(form.variants, form.price, form);
-
-  return (
-    <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border-2 border-gray-200 relative">
-      {canRemove && (
-        <button
-          type="button"
-          onClick={handleRemove}
-          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          title="Delete this payment plan only"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        {form.variants.length > 0 && (
-        <div className="md:col-span-1 space-y-2">
-          <label className="block text-sm font-medium text-gray-700">Applies To Variant</label>
-          <select 
-            value={plan.variantIndex ?? ""} 
-            onChange={e => {
-              const v = parseInt(e.target.value, 10);
-              if (Number.isNaN(v)) return;
-              const pp = [...form.paymentPlans];
-              pp[index].variantIndex = v;
-              setForm(f => ({ ...f, paymentPlans: pp }));
-              setTimeout(() => recalcPlan(index), 0);
-            }}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-white text-sm"
-            required
-          >
-            {(plan.variantIndex === null || plan.variantIndex === undefined) && (
-              <option value="" disabled> Select variant </option>
-            )}
-            {form.variants.map((v, vIdx) => (
-              <option key={vIdx} value={vIdx}>{v.variantName} (₨ {getVariantEffectivePrice(v).toLocaleString()})</option>
-            ))}
-          </select>
-        </div>
-        )}
-
-        <InputField
-          label="Plan Name"
-          value={plan.planName}
-          onChange={v => updatePlan('planName', v)}
-          placeholder="e.g., 12-Month Plan"
-        />
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">Interest Type</label>
-          <select
-            value={plan.interestType}
-            onChange={e => updatePlan('interestType', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
-          >
-            <option>Flat Rate</option>
-            <option>Reducing Balance</option>
-            <option>Profit-Based (Islamic/Shariah)</option>
-          </select>
-        </div>
-
-        <InputField
-          label="Tenure (Months)"
-          type="number"
-          value={plan.tenureMonths}
-          onChange={v => updatePlan('tenureMonths', v)}
-        />
-
-        <InputField
-          label="Down Payment (₨)"
-          type="number"
-          value={plan.downPayment}
-          onChange={v => updatePlan('downPayment', v)}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {plan.interestType === "Profit-Based (Islamic/Shariah)" ? (
-          <>
-            <InputField
-              label="Total Markup (₨)"
-              type="number"
-              value={plan.markup}
-              onChange={v => updatePlan('markup', v)}
-            />
-            <InputField
-              label="Markup Rate (%) - Auto"
-              type="number"
-              value={plan.interestRatePercent}
-              readOnly
-            />
-          </>
-        ) : (
-          <>
-            <InputField
-              label="Interest Rate (%)"
-              type="number"
-              value={plan.interestRatePercent}
-              onChange={v => updatePlan('interestRatePercent', v)}
-            />
-            <InputField
-              label="Total Markup (₨) - Auto"
-              type="number"
-              value={plan.markup}
-              readOnly
-            />
-          </>
-        )}
-      </div>
-
-      <PlanFinanceSection plan={plan} index={index} setForm={setForm} />
-
-      {/* Summary */}
-      <div className="bg-white rounded-xl p-4 border-2 border-red-100">
-        <div className="flex items-center gap-2 mb-4">
-          <Calculator className="w-5 h-5 text-red-600" />
-          <h4 className="font-bold text-gray-800">Calculation Summary</h4>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <SummaryItem label="Monthly (EMI)" value={plan.monthlyInstallment} highlight />
-          <SummaryItem label="Total Markup" value={plan.markup} />
-          <SummaryItem label="Total Payable" value={plan.installmentPrice} />
-          <SummaryItem label="Customer Cost" value={plan.totalCostToCustomer} highlight />
-          <SummaryItem label="Financed Amount" value={Math.max(0, planCashPrice - (plan.downPayment || 0))} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const SummaryItem = ({ label, value, highlight }) => (
-  <div className="text-center">
-    <p className="text-xs text-gray-500 mb-1">{label}</p>
-    <p className={`text-lg font-bold ${highlight ? 'text-red-600' : 'text-gray-800'}`}>
-      ₨ {Number(value || 0).toLocaleString()}
-    </p>
   </div>
 );
 

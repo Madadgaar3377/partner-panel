@@ -36,6 +36,8 @@ import {
   applyVariantPricingUpdate,
   applyBasePricingUpdate,
   mapVariantsForCreatePayload,
+  hasProductFinance,
+  isFinanceOnlyStep,
 } from '../../utils/installmentPartnerPlans';
 
 const planMatchesVariantIndex = (plan, vIdx) => Number(plan?.variantIndex) === Number(vIdx);
@@ -364,6 +366,65 @@ const CreateInstallmentPlan = () => {
         setError(null);
         try {
             const token = localStorage.getItem('userToken');
+            const isFinanceOnly = isFinanceOnlyStep(step4Tab);
+
+            if (isFinanceOnly) {
+                if (!hasProductFinance(form.finance)) {
+                    setError("Add bank name or finance information before saving.");
+                    setLoading(false);
+                    return;
+                }
+
+                if (selectedProductId) {
+                    const partnerUserId =
+                        form.userId || JSON.parse(localStorage.getItem("userData") || "{}")?.userId;
+                    const res = await fetch(`${baseApi}/updateInstallment/${selectedProductId}`, {
+                        method: "PUT",
+                        headers: {
+                            "Content-Type": "application/json",
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
+                        body: JSON.stringify({
+                            userId: partnerUserId,
+                            mergePartnerPlans: true,
+                            finance: form.finance || {},
+                        }),
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        throw new Error(data.message || "Failed to save finance information.");
+                    }
+                    setMessage("Finance information saved on this product.");
+                    setTimeout(() => navigate("/installments"), 2000);
+                    return;
+                }
+
+                const res = await fetch(`${baseApi}/createInstallmentPlan`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({
+                        ...form,
+                        category: form.category === "other" ? form.customCategory : form.category,
+                        price: 0,
+                        downpayment: 0,
+                        postedBy: "Partner",
+                        variants: [],
+                        paymentPlans: [],
+                        finance: form.finance || {},
+                    }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    setMessage("Finance listing created successfully.");
+                    setTimeout(() => navigate('/installments'), 2000);
+                } else {
+                    setError(data.message || "Failed to create finance listing.");
+                }
+                return;
+            }
 
             const isCashOnly = step4SaveMode === STEP4_SAVE_MODES.CASH;
             const isInstallmentsOnly = step4SaveMode === STEP4_SAVE_MODES.INSTALLMENTS_ONLY;
@@ -505,7 +566,8 @@ const CreateInstallmentPlan = () => {
 
     const isCashOnlyMode = step4SaveMode === STEP4_SAVE_MODES.CASH;
     const isInstallmentsOnlyMode = step4SaveMode === STEP4_SAVE_MODES.INSTALLMENTS_ONLY;
-    const showPaymentPlans = !isCashOnlyMode;
+    const isFinanceOnlyMode = isFinanceOnlyStep(step4Tab);
+    const showPaymentPlans = !isCashOnlyMode && !isFinanceOnlyMode;
 
     const updateVariantPricing = (vIdx, field, value) => {
         setForm((f) => {
@@ -529,6 +591,14 @@ const CreateInstallmentPlan = () => {
         if (step === 1) return form.productName && form.city && form.category;
         if (step === 3 && !selectedProductId) return form.productImages.length > 0;
         if (step === 4) {
+            if (isFinanceOnlyStep(step4Tab)) {
+                return hasProductFinance(form.finance);
+            }
+
+            if (step4Tab === "both" && !hasProductFinance(form.finance)) {
+                return false;
+            }
+
             const productPrice = deriveProductPrice(form.variants, form.price, form);
             const calcPrice = productPrice;
 
@@ -998,14 +1068,16 @@ const CreateInstallmentPlan = () => {
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                             <div className="flex flex-wrap items-center justify-between gap-4">
                                 <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-red-600 pl-4">
-                                    Variants & Payment Plans
+                                    {isFinanceOnlyMode ? "Bank Finance" : "Variants & Payment Plans"}
                                 </h2>
+                                {!isFinanceOnlyMode && (
                                 <div className="text-right">
                                     <p className="text-xs text-gray-500">Reference cash price</p>
                                     <p className="text-xl font-bold text-red-600">
                                         ₨ {deriveProductPrice(form.variants, form.price, form).toLocaleString()}
                                     </p>
                                 </div>
+                                )}
                             </div>
 
                             <PartnerStep4Tabs active={step4Tab} onChange={setStep4Tab} />
@@ -1014,6 +1086,7 @@ const CreateInstallmentPlan = () => {
                                 <ProductFinancePanel
                                     finance={form.finance}
                                     onUpdate={(field, value) => updateForm(`finance.${field}`, value)}
+                                    financeOnly={isFinanceOnlyMode}
                                 />
                             )}
 

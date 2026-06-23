@@ -26,11 +26,16 @@ export const PartnerStep4Tabs = ({ active, onChange }) => (
 );
 
 /** Product-level finance (step 4 finance / both tab) */
-export const ProductFinancePanel = ({ finance, onUpdate }) => (
+export const ProductFinancePanel = ({ finance, onUpdate, financeOnly = false }) => (
   <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
     <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
       <span>💰</span> Finance Information
     </h3>
+    {financeOnly && (
+      <p className="text-sm text-blue-800 mb-4">
+        Bank finance only — cash price and installment plans are not required.
+      </p>
+    )}
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>

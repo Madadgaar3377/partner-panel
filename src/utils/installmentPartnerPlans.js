@@ -35,7 +35,24 @@ export const STEP4_SAVE_MODES = {
   CASH: "cash",
   CASH_INSTALLMENTS: "cash_installments",
   INSTALLMENTS_ONLY: "installments_only",
+  FINANCE_ONLY: "finance_only",
 };
+
+export const stripHtmlText = (value) =>
+  String(value || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export const hasProductFinance = (finance) => {
+  if (!finance || typeof finance !== "object") return false;
+  const bankName = String(finance.bankName || "").trim();
+  const financeInfo = stripHtmlText(finance.financeInfo);
+  return Boolean(bankName || financeInfo);
+};
+
+export const isFinanceOnlyStep = (step4Tab) => step4Tab === "finance";
 
 /** Sync variant cash / discounted price and auto-calc discount % */
 export const applyVariantPricingUpdate = (variant, field, value) => {
@@ -802,9 +819,57 @@ export const submitInstallmentPlanUpdate = async ({
   token,
   savePricingOnly = false,
   step4SaveMode,
+  step4Tab,
 }) => {
   const profile = getPartnerProfileFromStorage();
   const uid = editorUserId || profile.userId;
+  const isFinanceOnly = isFinanceOnlyStep(step4Tab) || step4SaveMode === STEP4_SAVE_MODES.FINANCE_ONLY;
+
+  if (isFinanceOnly) {
+    if (!hasProductFinance(form.finance)) {
+      throw new Error("Add bank name or finance information before saving.");
+    }
+
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    const patch = {
+      userId: uid,
+      mergePartnerPlans: true,
+      finance: form.finance || {},
+    };
+
+    if (!isAttachedProduct) {
+      const category =
+        form.category === "other" ? form.customCategory || form.category : form.category;
+      Object.assign(patch, {
+        productName: form.productName,
+        city: form.city,
+        description: form.description || "",
+        companyName: form.companyName || "",
+        companyNameOther: form.companyNameOther || "",
+        category,
+        customCategory: form.customCategory || "",
+        videoUrl: form.videoUrl || "",
+        productImages: form.productImages || [],
+        productSpecifications: form.productSpecifications || {},
+        status: form.status || "pending",
+      });
+    }
+
+    const putRes = await fetch(`${baseApi}/updateInstallment/${installmentId}`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(patch),
+    });
+    const putData = await putRes.json();
+    if (!putData.success) {
+      throw new Error(putData.message || putData.error || "Failed to save finance information.");
+    }
+    return putData;
+  }
 
   const mode = step4SaveMode
     || (savePricingOnly ? STEP4_SAVE_MODES.CASH : STEP4_SAVE_MODES.CASH_INSTALLMENTS);
@@ -813,9 +878,11 @@ export const submitInstallmentPlanUpdate = async ({
 
   if (!isCashOnly) {
     for (const plan of form.paymentPlans || []) {
-      if (!plan.planName || !Number(plan.installmentPrice)) {
+      const hasPlanFinance =
+        plan.hasFinance && hasProductFinance(plan.finance);
+      if (!plan.planName || (!Number(plan.installmentPrice) && !hasPlanFinance)) {
         throw new Error(
-          `Plan "${plan.planName || "New plan"}" needs a name and valid total payable before saving.`
+          `Plan "${plan.planName || "New plan"}" needs a name and either total payable or bank finance details before saving.`
         );
       }
     }

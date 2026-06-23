@@ -23,6 +23,8 @@ import {
   deletePartnerPaymentPlanApi,
   applyVariantPricingUpdate,
   applyBasePricingUpdate,
+  hasProductFinance,
+  isFinanceOnlyStep,
 } from '../../utils/installmentPartnerPlans';
 import {
   PartnerStep4Tabs,
@@ -331,10 +333,13 @@ const EditInstallmentPlan = () => {
         baseApi,
         token,
         step4SaveMode,
+        step4Tab,
       });
 
       setMessage(
-        step4SaveMode === STEP4_SAVE_MODES.CASH && isAttachedProduct
+        isFinanceOnlyStep(step4Tab)
+          ? "Finance information saved successfully."
+          : step4SaveMode === STEP4_SAVE_MODES.CASH && isAttachedProduct
           ? "Your cash prices and variants saved on this product."
           : step4SaveMode === STEP4_SAVE_MODES.INSTALLMENTS_ONLY
           ? "Installment plans updated (cash prices not changed)."
@@ -352,7 +357,8 @@ const EditInstallmentPlan = () => {
   const fieldsLocked = isAttachedProduct;
   const isCashOnlyMode = step4SaveMode === STEP4_SAVE_MODES.CASH;
   const isInstallmentsOnlyMode = step4SaveMode === STEP4_SAVE_MODES.INSTALLMENTS_ONLY;
-  const showPaymentPlans = !isCashOnlyMode;
+  const isFinanceOnlyMode = isFinanceOnlyStep(step4Tab);
+  const showPaymentPlans = !isCashOnlyMode && !isFinanceOnlyMode;
 
   const updateVariantPricing = (vIdx, field, value) => {
     setForm((f) => {
@@ -376,6 +382,14 @@ const EditInstallmentPlan = () => {
     if (step === 1) return form.productName && form.city && form.category;
     if (step === 3 && !fieldsLocked) return form.productImages.length > 0;
     if (step === 4) {
+      if (isFinanceOnlyStep(step4Tab)) {
+        return hasProductFinance(form.finance);
+      }
+
+      if (step4Tab === "both" && !hasProductFinance(form.finance)) {
+        return false;
+      }
+
       const productPrice = deriveProductPrice(form.variants, form.price, form);
 
       if (isCashOnlyMode) {
@@ -791,14 +805,16 @@ const EditInstallmentPlan = () => {
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-2xl font-bold text-gray-800 border-l-4 border-red-600 pl-4">
-                  Variants & Payment Plans
+                  {isFinanceOnlyMode ? "Bank Finance" : "Variants & Payment Plans"}
                 </h2>
+                {!isFinanceOnlyMode && (
                 <div className="text-right">
                   <p className="text-xs text-gray-500">Reference cash price</p>
                   <p className="text-xl font-bold text-red-600">
                     ₨ {deriveProductPrice(form.variants, form.price, form).toLocaleString()}
                   </p>
                 </div>
+                )}
               </div>
 
               <PartnerStep4Tabs active={step4Tab} onChange={setStep4Tab} />
@@ -807,6 +823,7 @@ const EditInstallmentPlan = () => {
                 <ProductFinancePanel
                   finance={form.finance}
                   onUpdate={(field, value) => updateForm(`finance.${field}`, value)}
+                  financeOnly={isFinanceOnlyMode}
                 />
               )}
 

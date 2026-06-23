@@ -127,6 +127,68 @@ export const getBaseEffectivePrice = (form) => {
   return Math.round(cash * (1 - disc / 100));
 };
 
+export const amortizedMonthlyPayment = (principal, annualInterestPercent, months) => {
+  if (!months || months <= 0) return 0;
+  const r = Number(annualInterestPercent) / 100 / 12;
+  if (!r) return principal / months;
+  return (principal * r) / (1 - Math.pow(1 + r, -months));
+};
+
+/** Recalculate EMI, markup, totals for one payment plan row (canonical partner-panel formulas) */
+export function recalculatePaymentPlan(plan, form) {
+  const p = { ...plan };
+
+  let cashPrice = 0;
+  if (
+    p.variantIndex !== undefined &&
+    p.variantIndex !== null &&
+    p.variantIndex !== -1 &&
+    form.variants?.[p.variantIndex]
+  ) {
+    cashPrice = getVariantEffectivePrice(form.variants[p.variantIndex]);
+  } else {
+    cashPrice = deriveProductPrice(form.variants, form.price, form);
+  }
+
+  const downPayment = Number(p.downPayment) || 0;
+  const financedAmount = Math.max(0, cashPrice - downPayment);
+  const months = parseInt(p.tenureMonths, 10) || 0;
+  const isIslamic = p.interestType === "Profit-Based (Islamic/Shariah)";
+  const isReducing = p.interestType === "Reducing Balance";
+
+  let monthly = 0;
+  let totalPayable = 0;
+  let totalMarkup = 0;
+  let rate = Number(p.interestRatePercent) || 0;
+
+  if (isIslamic) {
+    totalMarkup = Number(p.markup) || 0;
+    rate = cashPrice > 0 ? (totalMarkup / cashPrice) * 100 : 0;
+    totalPayable = financedAmount + totalMarkup;
+    monthly = months > 0 ? totalPayable / months : 0;
+  } else if (isReducing) {
+    monthly = amortizedMonthlyPayment(financedAmount, rate, months);
+    totalPayable = monthly * months;
+    totalMarkup = Math.max(0, totalPayable - financedAmount);
+  } else {
+    totalMarkup = financedAmount * (rate / 100) * (months / 12);
+    totalPayable = financedAmount + totalMarkup;
+    monthly = months > 0 ? totalPayable / months : 0;
+  }
+
+  const totalCostToCustomer = cashPrice + totalMarkup;
+
+  return {
+    ...p,
+    interestRatePercent: Number(rate.toFixed(2)),
+    markup: Number(totalMarkup.toFixed(2)),
+    monthlyInstallment: Number(monthly.toFixed(2)),
+    installmentPrice: Number(totalPayable.toFixed(2)),
+    totalInterest: Number(totalMarkup.toFixed(2)),
+    totalCostToCustomer: Number(totalCostToCustomer.toFixed(2)),
+  };
+}
+
 export const deriveProductPrice = (variants, fallback = 0, formForBase = null) => {
   if (variants?.length) {
     const prices = variants.map(getVariantEffectivePrice).filter((p) => p > 0);

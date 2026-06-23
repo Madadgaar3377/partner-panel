@@ -7,8 +7,12 @@ const INTEGRATION_BASE = `${baseApi}/v1/partner`;
 export const SCOPE_OPTIONS = [
   { id: 'installments:read', label: 'Installments  read', description: 'List and view your installment products' },
   { id: 'installments:write', label: 'Installments  write', description: 'Create, update, and delete products' },
-  { id: 'applications:read', label: 'Applications  read', description: 'View incoming customer requests' },
-  { id: 'applications:write', label: 'Applications  write', description: 'Approve, reject, or update request status' },
+  { id: 'applications:read', label: 'Applications  read', description: 'View incoming installment customer requests' },
+  { id: 'applications:write', label: 'Applications  write', description: 'Approve, reject, or update installment request status' },
+  { id: 'loans:read', label: 'Loans  read', description: 'List and view your loan plans' },
+  { id: 'loans:write', label: 'Loans  write', description: 'Create, update, and delete loan plans' },
+  { id: 'loan-applications:read', label: 'Loan applications  read', description: 'View customer loan applications on your plans' },
+  { id: 'loan-applications:write', label: 'Loan applications  write', description: 'Approve, reject, or update loan application status' },
   { id: 'dashboard:read', label: 'Dashboard  read', description: 'Fetch dashboard statistics' },
   { id: 'profile:read', label: 'Profile  read', description: 'Verify API key and read partner profile' },
 ];

@@ -116,15 +116,13 @@ export const applyBasePricingUpdate = (form, field, value) => {
   const cash = roundPKR(next.price);
 
   if (field === "price") {
-    if (!next.discountedPrice && next.discountedPrice !== 0) {
-      next.discountedPrice = value;
-    } else if (Number(next.discountedPrice) > cash && cash > 0) {
-      next.discountedPrice = value;
+    const prevDiscounted = roundPKR(next.discountedPrice);
+    if (prevDiscounted <= 0 || prevDiscounted >= cash - 1) {
+      next.discountedPrice = "";
+      next.discountPercent = 0;
+    } else {
+      next.discountPercent = calcDiscountPercentFromPrices(cash, prevDiscounted);
     }
-    next.discountPercent = calcDiscountPercentFromPrices(
-      cash,
-      Number(next.discountedPrice) ?? cash
-    );
   } else if (field === "discountedPrice") {
     const discounted = Number(value);
     if (cash > 0 && Number.isFinite(discounted)) {
@@ -761,6 +759,37 @@ export const buildAddPlanPayload = (plan, form, profile, editorUserId) => {
   );
 };
 
+/** Clear stale variant discounts when saving plain cash price */
+export const shouldClearProductDiscounts = (form, { cashOnly = false } = {}) => {
+  if (cashOnly) return true;
+  const cash = roundPKR(form?.price);
+  const pct = Number(form?.discountPercent) || 0;
+  const discounted = roundPKR(form?.discountedPrice);
+  if (pct > 0 && discounted > 0 && discounted < cash - 1) return false;
+  if (pct > 0 && cash > 0) return false;
+  return true;
+};
+
+export const normalizeVariantsForCashSave = (variants, rootPrice, options = {}) => {
+  const { cashOnly = false, clearDiscounts = false } = options;
+  const list = variants || [];
+  if (!list.length) return list;
+  const root = roundPKR(rootPrice);
+  const syncSingle = (clearDiscounts || cashOnly) && root > 0 && list.length === 1;
+
+  return list.map((v) => {
+    const next = { ...v };
+    if (clearDiscounts || cashOnly) {
+      next.discountPercent = 0;
+      next.discountedPrice = "";
+    }
+    if (syncSingle) {
+      next.price = root;
+    }
+    return next;
+  });
+};
+
 /** PUT body aligned with createInstallmentPlan POST shape */
 export const buildInstallmentUpdateBody = ({
   form,
@@ -780,6 +809,11 @@ export const buildInstallmentUpdateBody = ({
       ? explicitPrice
       : roundPKR(calcProductPrice);
   const profile = getPartnerProfileFromStorage();
+  const clearDiscounts = shouldClearProductDiscounts(form, { cashOnly });
+  const variantsForSave = normalizeVariantsForCashSave(form.variants, explicitPrice, {
+    cashOnly,
+    clearDiscounts,
+  });
 
   const withPartnerId = (p, cashPrice) => {
     const mapped = mapPlanForApi(p, form, cashPrice);
@@ -795,7 +829,7 @@ export const buildInstallmentUpdateBody = ({
     return Number(raw) === vIdx;
   };
 
-  const catalogVariantsForPayload = (form.variants || [])
+  const catalogVariantsForPayload = (variantsForSave || [])
     .map((v, vIdx) => ({ v, vIdx }))
     .filter(({ v }) => v.isCatalogVariant);
 
@@ -824,13 +858,13 @@ export const buildInstallmentUpdateBody = ({
     return {
       variantName: v.variantName,
       price: roundPKR(v.price),
-      discountPercent: Number(v.discountPercent) || 0,
+      discountPercent: clearDiscounts || cashOnly ? 0 : Number(v.discountPercent) || 0,
       status: v.status || "active",
       paymentPlans: variantPlans,
     };
   });
 
-  const ownerVariantsPayload = (form.variants || []).map((v, vIdx) => {
+  const ownerVariantsPayload = (variantsForSave || []).map((v, vIdx) => {
     const variantPlans = plansSource
       .filter((p) => variantIndexMatchesEditor(p, vIdx))
       .map((p) => withPartnerId(p, getVariantEffectivePrice(v)));
@@ -848,7 +882,7 @@ export const buildInstallmentUpdateBody = ({
     return {
       variantName: v.variantName,
       price: roundPKR(v.price),
-      discountPercent: Number(v.discountPercent) || 0,
+      discountPercent: clearDiscounts || cashOnly ? 0 : Number(v.discountPercent) || 0,
       status: v.status || "active",
       paymentPlans: variantPlans,
     };
@@ -876,8 +910,8 @@ export const buildInstallmentUpdateBody = ({
     };
     if (!installmentsOnly) {
       body.partnerBasePrice = roundPKR(form.partnerBasePrice || form.price);
-      body.partnerVariantPricing = buildPartnerVariantPricing(form.variants);
-      body.partnerOwnedVariants = buildPartnerOwnedVariantsPayload(form.variants);
+      body.partnerVariantPricing = buildPartnerVariantPricing(variantsForSave);
+      body.partnerOwnedVariants = buildPartnerOwnedVariantsPayload(variantsForSave);
     }
     return body;
   }

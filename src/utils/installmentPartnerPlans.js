@@ -1,6 +1,30 @@
 import { CATEGORY_SPECIFICATIONS } from '../constants/productCategories';
 import baseApi from '../constants/apiUrl';
 
+/** Whole PKR amounts — avoids 39999 → 39997 float drift */
+export const roundPKR = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n);
+};
+
+export const planHasFinanceDetails = (plan) => {
+  if (!plan) return false;
+  const finance = plan.finance || {};
+  return Boolean(
+    String(finance.bankName || "").trim() ||
+      stripHtmlText(finance.financeInfo)
+  );
+};
+
+/** Keep only plans the partner actually configured (not empty template rows) */
+export const filterValidPaymentPlans = (plans = []) =>
+  (plans || []).filter((plan) => {
+    if (!String(plan?.planName || "").trim()) return false;
+    if (planHasFinanceDetails(plan) || plan.hasFinance) return true;
+    return roundPKR(plan.installmentPrice) > 0 || roundPKR(plan.monthlyInstallment) > 0;
+  });
+
 export const DEFAULT_INSTALLMENT_PLAN = {
   planName: "",
   installmentPrice: 0,
@@ -25,9 +49,11 @@ export const calcDiscountPercentFromPrices = (cashPrice, discountedPrice) => {
 };
 
 export const calcDiscountedPriceFromPercent = (cashPrice, discountPercent) => {
-  const cash = Number(cashPrice) || 0;
+  const cash = roundPKR(cashPrice);
   const disc = Math.min(100, Math.max(0, Number(discountPercent) || 0));
-  return Math.round(cash * (1 - disc / 100));
+  if (cash <= 0) return 0;
+  if (disc <= 0) return cash;
+  return roundPKR(cash * (1 - disc / 100));
 };
 
 /** Step 4 save modes on create installment */
@@ -56,8 +82,8 @@ export const isFinanceOnlyStep = (step4Tab) => step4Tab === "finance";
 
 /** Sync variant cash / discounted price and auto-calc discount % */
 export const applyVariantPricingUpdate = (variant, field, value) => {
-  const next = { ...variant, [field]: value };
-  const cash = Number(next.price) || 0;
+  const next = { ...variant, [field]: field === "price" || field === "discountedPrice" ? roundPKR(value) : value };
+  const cash = roundPKR(next.price);
 
   if (field === "price") {
     const discounted = Number(next.discountedPrice);
@@ -83,8 +109,11 @@ export const applyVariantPricingUpdate = (variant, field, value) => {
 
 /** Sync base product price fields (no variants) */
 export const applyBasePricingUpdate = (form, field, value) => {
-  const next = { ...form, [field]: value };
-  const cash = Number(next.price) || 0;
+  const next = {
+    ...form,
+    [field]: field === "price" || field === "discountedPrice" ? roundPKR(value) : value,
+  };
+  const cash = roundPKR(next.price);
 
   if (field === "price") {
     if (!next.discountedPrice && next.discountedPrice !== 0) {
@@ -109,22 +138,24 @@ export const applyBasePricingUpdate = (form, field, value) => {
 
 export const getVariantEffectivePrice = (variant) => {
   if (!variant) return 0;
-  const discounted = Number(variant.discountedPrice);
-  if (Number.isFinite(discounted) && discounted > 0) {
-    return Math.round(discounted);
-  }
-  const base = Number(variant.price) || 0;
+  const discounted = roundPKR(variant.discountedPrice);
+  if (discounted > 0) return discounted;
+  const base = roundPKR(variant.price);
   const disc = Math.min(100, Math.max(0, Number(variant.discountPercent) || 0));
-  return Math.round(base * (1 - disc / 100));
+  if (base <= 0) return 0;
+  if (disc <= 0) return base;
+  return roundPKR(base * (1 - disc / 100));
 };
 
 /** Effective price when product has no variant rows */
 export const getBaseEffectivePrice = (form) => {
-  const discounted = Number(form?.discountedPrice);
-  if (Number.isFinite(discounted) && discounted > 0) return Math.round(discounted);
-  const cash = Number(form?.price) || 0;
+  const discounted = roundPKR(form?.discountedPrice);
+  if (discounted > 0) return discounted;
+  const cash = roundPKR(form?.price);
   const disc = Math.min(100, Math.max(0, Number(form?.discountPercent) || 0));
-  return Math.round(cash * (1 - disc / 100));
+  if (cash <= 0) return 0;
+  if (disc <= 0) return cash;
+  return roundPKR(cash * (1 - disc / 100));
 };
 
 export const amortizedMonthlyPayment = (principal, annualInterestPercent, months) => {
@@ -147,10 +178,11 @@ export function recalculatePaymentPlan(plan, form) {
   ) {
     cashPrice = getVariantEffectivePrice(form.variants[p.variantIndex]);
   } else {
-    cashPrice = deriveProductPrice(form.variants, form.price, form);
+    const explicit = roundPKR(form.price);
+    cashPrice = explicit > 0 ? explicit : getBaseEffectivePrice(form);
   }
 
-  const downPayment = Number(p.downPayment) || 0;
+  const downPayment = roundPKR(p.downPayment);
   const financedAmount = Math.max(0, cashPrice - downPayment);
   const months = parseInt(p.tenureMonths, 10) || 0;
   const isIslamic = p.interestType === "Profit-Based (Islamic/Shariah)";
@@ -180,12 +212,13 @@ export function recalculatePaymentPlan(plan, form) {
 
   return {
     ...p,
+    cashPrice: roundPKR(cashPrice),
     interestRatePercent: Number(rate.toFixed(2)),
-    markup: Number(totalMarkup.toFixed(2)),
-    monthlyInstallment: Number(monthly.toFixed(2)),
-    installmentPrice: Number(totalPayable.toFixed(2)),
-    totalInterest: Number(totalMarkup.toFixed(2)),
-    totalCostToCustomer: Number(totalCostToCustomer.toFixed(2)),
+    markup: roundPKR(totalMarkup),
+    monthlyInstallment: roundPKR(monthly),
+    installmentPrice: roundPKR(totalPayable),
+    totalInterest: roundPKR(totalMarkup),
+    totalCostToCustomer: roundPKR(totalCostToCustomer),
   };
 }
 
@@ -198,7 +231,7 @@ export const deriveProductPrice = (variants, fallback = 0, formForBase = null) =
     const baseEff = getBaseEffectivePrice(formForBase);
     if (baseEff > 0) return baseEff;
   }
-  return Number(fallback) || 0;
+  return roundPKR(Number(fallback) || 0);
 };
 
 /** Variants payload for create  strips cash prices when saving installments only */
@@ -516,7 +549,9 @@ export const mapInstallmentPlanToForm = (plan, partnerUserId) => {
     : Number(plan.discountPercent) || 0;
   const discountedPrice =
     Number(price) > 0
-      ? calcDiscountedPriceFromPercent(price, discountPercent)
+      ? discountPercent > 0
+        ? calcDiscountedPriceFromPercent(price, discountPercent)
+        : roundPKR(price)
       : "";
 
   return {
@@ -540,7 +575,7 @@ export const mapInstallmentPlanToForm = (plan, partnerUserId) => {
     customCategory,
     status: plan.status || "pending",
     productImages: plan.productImages || [],
-    paymentPlans: paymentPlans.length ? paymentPlans : [{ ...DEFAULT_INSTALLMENT_PLAN }],
+    paymentPlans,
     productSpecifications: mergeProductSpecifications(plan),
     variants,
     finance: plan.finance || { bankName: "", financeInfo: "" },
@@ -665,13 +700,13 @@ export const mapPlanForApi = (plan, form, cashPriceOverride) => {
   const mapped = {
     ...stripPlanForApi(plan),
     variantIndex,
-    cashPrice,
-    installmentPrice: Number(plan.installmentPrice) || 0,
-    downPayment: Number(plan.downPayment) || 0,
-    monthlyInstallment: Number(plan.monthlyInstallment) || 0,
+    cashPrice: roundPKR(cashPrice),
+    installmentPrice: roundPKR(plan.installmentPrice),
+    downPayment: roundPKR(plan.downPayment),
+    monthlyInstallment: roundPKR(plan.monthlyInstallment),
     tenureMonths: Number(plan.tenureMonths) || 0,
     interestRatePercent: Number(plan.interestRatePercent) || 0,
-    markup: Number(plan.markup) || 0,
+    markup: roundPKR(plan.markup),
     finance:
       plan.hasFinance && (plan.finance?.bankName || plan.finance?.financeInfo)
         ? plan.finance
@@ -733,10 +768,17 @@ export const buildInstallmentUpdateBody = ({
   isAttachedProduct,
   plansForUpdate,
   installmentsOnly = false,
+  cashOnly = false,
 }) => {
-  const plansSource = plansForUpdate ?? form.paymentPlans ?? [];
+  const rawPlans = cashOnly ? [] : plansForUpdate ?? form.paymentPlans ?? [];
+  const plansSource = cashOnly ? [] : filterValidPaymentPlans(rawPlans);
+  const explicitPrice = roundPKR(form.price);
   const calcProductPrice = deriveProductPrice(form.variants, form.price, form);
-  const productPrice = installmentsOnly ? 0 : calcProductPrice;
+  const productPrice = installmentsOnly
+    ? 0
+    : explicitPrice > 0 && !(form.variants || []).length
+      ? explicitPrice
+      : roundPKR(calcProductPrice);
   const profile = getPartnerProfileFromStorage();
 
   const withPartnerId = (p, cashPrice) => {
@@ -781,7 +823,7 @@ export const buildInstallmentUpdateBody = ({
 
     return {
       variantName: v.variantName,
-      price: Number(v.price) || 0,
+      price: roundPKR(v.price),
       discountPercent: Number(v.discountPercent) || 0,
       status: v.status || "active",
       paymentPlans: variantPlans,
@@ -805,7 +847,7 @@ export const buildInstallmentUpdateBody = ({
 
     return {
       variantName: v.variantName,
-      price: Number(v.price) || 0,
+      price: roundPKR(v.price),
       discountPercent: Number(v.discountPercent) || 0,
       status: v.status || "active",
       paymentPlans: variantPlans,
@@ -833,7 +875,7 @@ export const buildInstallmentUpdateBody = ({
       variants: variantsPayload,
     };
     if (!installmentsOnly) {
-      body.partnerBasePrice = Number(form.partnerBasePrice || form.price) || 0;
+      body.partnerBasePrice = roundPKR(form.partnerBasePrice || form.price);
       body.partnerVariantPricing = buildPartnerVariantPricing(form.variants);
       body.partnerOwnedVariants = buildPartnerOwnedVariantsPayload(form.variants);
     }
@@ -939,7 +981,8 @@ export const submitInstallmentPlanUpdate = async ({
   const isInstallmentsOnly = mode === STEP4_SAVE_MODES.INSTALLMENTS_ONLY;
 
   if (!isCashOnly) {
-    for (const plan of form.paymentPlans || []) {
+    const plansToValidate = filterValidPaymentPlans(form.paymentPlans || []);
+    for (const plan of plansToValidate) {
       const hasPlanFinance =
         plan.hasFinance && hasProductFinance(plan.finance);
       if (!plan.planName || (!Number(plan.installmentPrice) && !hasPlanFinance)) {
@@ -964,8 +1007,9 @@ export const submitInstallmentPlanUpdate = async ({
     form,
     editorUserId: uid,
     isAttachedProduct,
-    plansForUpdate: form.paymentPlans,
+    plansForUpdate: isCashOnly ? [] : form.paymentPlans,
     installmentsOnly: isInstallmentsOnly,
+    cashOnly: isCashOnly,
   });
 
   enrichUpdatePayloadWithPartnerMeta(patch, profile, uid);

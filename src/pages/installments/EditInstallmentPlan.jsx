@@ -23,6 +23,8 @@ import {
   hasProductFinance,
   isFinanceOnlyStep,
   recalculatePaymentPlan,
+  filterValidPaymentPlans,
+  roundPKR,
 } from '../../utils/installmentPartnerPlans';
 import {
   PartnerStep4Tabs,
@@ -115,6 +117,18 @@ const EditInstallmentPlan = () => {
             const { _meta, ...formData } = mapped;
             setIsAttachedProduct(_meta.attached);
             setForm((prev) => ({ ...prev, ...formData }));
+
+            const validPlans = filterValidPaymentPlans(formData.paymentPlans || []);
+            const hasCashPrice =
+              roundPKR(formData.price) > 0 ||
+              (formData.variants || []).some((v) => roundPKR(v.price) > 0);
+            if (!validPlans.length && hasCashPrice) {
+              setStep4SaveMode(STEP4_SAVE_MODES.CASH);
+            } else if (validPlans.length && !hasCashPrice) {
+              setStep4SaveMode(STEP4_SAVE_MODES.INSTALLMENTS_ONLY);
+            } else if (validPlans.length && hasCashPrice) {
+              setStep4SaveMode(STEP4_SAVE_MODES.CASH_INSTALLMENTS);
+            }
           } else {
             setError('Installment plan not found');
           }
@@ -135,14 +149,16 @@ const EditInstallmentPlan = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  useEffect(() => {
-    if (!fetchLoading && form.paymentPlans?.length) {
-      form.paymentPlans.forEach((_, idx) => recalcPlan(idx));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchLoading]);
+  // --- Calculation Logic ---
+  const recalcPlan = (index) => {
+    setForm(f => {
+      if (!f.paymentPlans || !f.paymentPlans[index]) return f;
+      const pp = [...f.paymentPlans];
+      pp[index] = recalculatePaymentPlan(pp[index], f);
+      return { ...f, paymentPlans: pp };
+    });
+  };
 
-  // Helper to update nested path safely
   const updateForm = (path, value) => {
     if (!path.includes('.')) {
       setForm(prev => ({ ...prev, [path]: value }));
@@ -201,23 +217,6 @@ const EditInstallmentPlan = () => {
     const spec = form.productSpecifications.specifications.find(s => s.field === fieldName);
     return spec ? spec.value : '';
   };
-
-  // --- Calculation Logic ---
-  const recalcPlan = (index) => {
-    setForm(f => {
-      if (!f.paymentPlans || !f.paymentPlans[index]) return f;
-      const pp = [...f.paymentPlans];
-      pp[index] = recalculatePaymentPlan(pp[index], f);
-      return { ...f, paymentPlans: pp };
-    });
-  };
-
-  useEffect(() => {
-    if (form.paymentPlans.length) {
-      form.paymentPlans.forEach((_, idx) => recalcPlan(idx));
-    }
-    // eslint-disable-next-line
-  }, [form.price, form.variants, form.discountedPrice, form.discountPercent]);
 
   // --- Image Handling ---
   const handleFilesChange = (e) => {

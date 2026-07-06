@@ -1,9 +1,75 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, FileText, DollarSign, Calendar, TrendingUp, AlertCircle, Eye, Edit, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  Plus,
+  FileText,
+  DollarSign,
+  Calendar,
+  TrendingUp,
+  AlertCircle,
+  Eye,
+  Edit,
+  Trash2,
+  Search,
+  Filter,
+  X,
+  MapPin,
+  User,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import { PageLoader } from '../../components/Loader';
 import baseApi from '../../constants/apiUrl';
+import { PRODUCT_CATEGORIES } from '../../constants/productCategories';
+
+const CATEGORY_LABELS = Object.fromEntries(
+  PRODUCT_CATEGORIES.map((c) => [c.value, c.label])
+);
+
+const formatCategory = (value) => {
+  if (!value) return '';
+  return CATEGORY_LABELS[value] || value.replace(/_/g, ' ');
+};
+
+const isOwnerListing = (item) =>
+  item.isProductOwner !== false && item.partnerRole !== 'contributor';
+
+const getCreatorLabel = (item) => {
+  if (isOwnerListing(item)) {
+    return (
+      item.companyName ||
+      item.companyNameOther ||
+      item.createdBy?.[0]?.name ||
+      item.postedBy ||
+      'You'
+    );
+  }
+  return (
+    item.ownerCompanyName ||
+    item.companyName ||
+    item.createdBy?.[0]?.name ||
+    'Unknown'
+  );
+};
+
+const getSearchBlob = (item) => {
+  const parts = [
+    item.productName,
+    item.installmentPlanId,
+    item._id,
+    item.category,
+    item.customCategory,
+    item.city,
+    item.companyName,
+    item.companyNameOther,
+    item.ownerCompanyName,
+    item.description,
+    item.postedBy,
+    item.createdBy?.[0]?.name,
+    item.createdBy?.[0]?.userId,
+    item.createdBy?.[0]?.email,
+  ];
+  return parts.filter(Boolean).join(' ').toLowerCase();
+};
 
 const InstallmentsList = () => {
   const navigate = useNavigate();
@@ -12,10 +78,19 @@ const InstallmentsList = () => {
   const [error, setError] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(null);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [filterCity, setFilterCity] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterListingType, setFilterListingType] = useState('All');
+  const [filterCreator, setFilterCreator] = useState('All');
+  const [sortBy, setSortBy] = useState('newest');
+  const [showFilters, setShowFilters] = useState(true);
+
   const fetchInstallments = useCallback(async () => {
     try {
       const token = localStorage.getItem('userToken');
-      
+
       if (!token) {
         navigate('/');
         return;
@@ -25,8 +100,8 @@ const InstallmentsList = () => {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       const data = await response.json();
@@ -55,8 +130,99 @@ const InstallmentsList = () => {
     fetchInstallments();
   }, [navigate, fetchInstallments]);
 
+  const filterOptions = useMemo(() => {
+    const categories = new Set();
+    const cities = new Set();
+    const statuses = new Set();
+    const creators = new Set();
+
+    installments.forEach((item) => {
+      const cat = item.category || item.customCategory;
+      if (cat) categories.add(cat);
+      if (item.city) cities.add(item.city);
+      if (item.status) statuses.add(item.status);
+      creators.add(getCreatorLabel(item));
+    });
+
+    return {
+      categories: Array.from(categories).sort(),
+      cities: Array.from(cities).sort(),
+      statuses: Array.from(statuses).sort(),
+      creators: Array.from(creators).sort(),
+    };
+  }, [installments]);
+
+  const hasActiveFilters =
+    searchTerm.trim() !== '' ||
+    filterCategory !== 'All' ||
+    filterCity !== 'All' ||
+    filterStatus !== 'All' ||
+    filterListingType !== 'All' ||
+    filterCreator !== 'All' ||
+    sortBy !== 'newest';
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterCategory('All');
+    setFilterCity('All');
+    setFilterStatus('All');
+    setFilterListingType('All');
+    setFilterCreator('All');
+    setSortBy('newest');
+  };
+
+  const filteredInstallments = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+
+    let rows = installments.filter((item) => {
+      if (q && !getSearchBlob(item).includes(q)) return false;
+
+      const cat = item.category || item.customCategory || '';
+      if (filterCategory !== 'All' && cat !== filterCategory) return false;
+
+      if (filterCity !== 'All' && item.city !== filterCity) return false;
+
+      const status = (item.status || 'active').toLowerCase();
+      if (filterStatus !== 'All' && status !== filterStatus.toLowerCase()) return false;
+
+      if (filterListingType === 'owner' && !isOwnerListing(item)) return false;
+      if (filterListingType === 'shared' && isOwnerListing(item)) return false;
+
+      if (filterCreator !== 'All' && getCreatorLabel(item) !== filterCreator) return false;
+
+      return true;
+    });
+
+    rows = [...rows].sort((a, b) => {
+      if (sortBy === 'oldest') {
+        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+      }
+      if (sortBy === 'name') {
+        return (a.productName || '').localeCompare(b.productName || '');
+      }
+      if (sortBy === 'price_high') {
+        return Number(b.price || 0) - Number(a.price || 0);
+      }
+      if (sortBy === 'price_low') {
+        return Number(a.price || 0) - Number(b.price || 0);
+      }
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+
+    return rows;
+  }, [
+    installments,
+    searchTerm,
+    filterCategory,
+    filterCity,
+    filterStatus,
+    filterListingType,
+    filterCreator,
+    sortBy,
+  ]);
+
   const handleDelete = async (installment) => {
-    if (installment.isProductOwner === false || installment.partnerRole === 'contributor') {
+    if (!isOwnerListing(installment)) {
       setError('You cannot delete the whole product. Open Edit to remove only your payment plans.');
       return;
     }
@@ -76,8 +242,8 @@ const InstallmentsList = () => {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       const data = await response.json();
@@ -108,16 +274,21 @@ const InstallmentsList = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
       <Navbar />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Installment Plans</h1>
-            <p className="text-gray-600 mt-1">Manage all your installment plans</p>
+            <p className="text-gray-600 mt-1">
+              {installments.length > 0
+                ? `Showing ${filteredInstallments.length} of ${installments.length} plan${installments.length !== 1 ? 's' : ''}`
+                : 'Manage all your installment plans'}
+            </p>
           </div>
           <button
+            type="button"
             onClick={() => navigate('/installments/create')}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg"
           >
             <Plus className="w-5 h-5" />
             Create Plan
@@ -137,6 +308,7 @@ const InstallmentsList = () => {
             <h3 className="text-xl font-semibold text-gray-800 mb-2">No Installment Plans Yet</h3>
             <p className="text-gray-600 mb-6">Create your first installment plan to get started</p>
             <button
+              type="button"
               onClick={() => navigate('/installments/create')}
               className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg"
             >
@@ -145,13 +317,149 @@ const InstallmentsList = () => {
           </div>
         ) : (
           <>
+            {/* Search & filters */}
+            <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-blue-600" />
+                  Search &amp; filter plans
+                </h2>
+                <div className="flex items-center gap-2">
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Clear filters
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowFilters((v) => !v)}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                  >
+                    {showFilters ? 'Hide filters' : 'Show filters'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative mb-4">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="search"
+                  placeholder="Search by product name, ID, company, creator, city..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              {showFilters && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+                    <select
+                      value={filterCategory}
+                      onChange={(e) => setFilterCategory(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="All">All categories</option>
+                      {filterOptions.categories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {formatCategory(cat)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">City</label>
+                    <select
+                      value={filterCity}
+                      onChange={(e) => setFilterCity(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="All">All cities</option>
+                      {filterOptions.cities.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="All">All statuses</option>
+                      {filterOptions.statuses.map((status) => (
+                        <option key={status} value={status}>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Listing type</label>
+                    <select
+                      value={filterListingType}
+                      onChange={(e) => setFilterListingType(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="All">All listings</option>
+                      <option value="owner">Your listings</option>
+                      <option value="shared">Shared (your plans only)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Created by</label>
+                    <select
+                      value={filterCreator}
+                      onChange={(e) => setFilterCreator(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="All">All partners</option>
+                      {filterOptions.creators.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Sort by</label>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="newest">Newest first</option>
+                      <option value="oldest">Oldest first</option>
+                      <option value="name">Name A–Z</option>
+                      <option value="price_high">Price: high to low</option>
+                      <option value="price_low">Price: low to high</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="glass-red rounded-xl p-6 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Total Plans</p>
-                    <p className="text-3xl font-bold text-gray-800">{installments.length}</p>
+                    <p className="text-sm text-gray-600 mb-1">Matching plans</p>
+                    <p className="text-3xl font-bold text-gray-800">{filteredInstallments.length}</p>
                   </div>
                   <div className="p-3 bg-blue-100 rounded-lg">
                     <FileText className="w-6 h-6 text-blue-600" />
@@ -162,9 +470,9 @@ const InstallmentsList = () => {
               <div className="glass-red rounded-xl p-6 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Active Plans</p>
+                    <p className="text-sm text-gray-600 mb-1">Your listings</p>
                     <p className="text-3xl font-bold text-gray-800">
-                      {installments.filter(i => i.status === 'active').length}
+                      {filteredInstallments.filter(isOwnerListing).length}
                     </p>
                   </div>
                   <div className="p-3 bg-green-100 rounded-lg">
@@ -176,9 +484,9 @@ const InstallmentsList = () => {
               <div className="glass-red rounded-xl p-6 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Total Value</p>
+                    <p className="text-sm text-gray-600 mb-1">Filtered value</p>
                     <p className="text-3xl font-bold text-gray-800">
-                      ₨ {installments.reduce((sum, i) => sum + (i.totalAmount || 0), 0).toLocaleString()}
+                      ₨ {filteredInstallments.reduce((sum, i) => sum + (Number(i.price) || 0), 0).toLocaleString()}
                     </p>
                   </div>
                   <div className="p-3 bg-purple-100 rounded-lg">
@@ -188,164 +496,190 @@ const InstallmentsList = () => {
               </div>
             </div>
 
-            {/* Installments Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {installments.map((installment) => {
-                const isOwner = installment.isProductOwner !== false && installment.partnerRole !== 'contributor';
-                const myCount = installment.myPlanCount ?? 0;
-                const preview = installment.myPlansPreview?.[0];
-                const mainImage = installment.productImages?.[0] || '';
-                const listId = installment.installmentPlanId || installment._id;
+            {filteredInstallments.length === 0 ? (
+              <div className="glass-red rounded-xl shadow-lg p-8 text-center">
+                <Search className="w-14 h-14 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">No plans match your filters</h3>
+                <p className="text-gray-600 mb-6">Try a different search term or clear the filters</p>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredInstallments.map((installment) => {
+                  const isOwner = isOwnerListing(installment);
+                  const myCount = installment.myPlanCount ?? 0;
+                  const preview = installment.myPlansPreview?.[0];
+                  const mainImage = installment.productImages?.[0] || '';
+                  const listId = installment.installmentPlanId || installment._id;
+                  const creatorLabel = getCreatorLabel(installment);
+                  const categoryLabel = formatCategory(installment.category || installment.customCategory);
 
-                return (
-                  <div
-                    key={listId}
-                    className="glass-red rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
-                  >
-                    {/* Product Image */}
-                    {mainImage && (
-                      <div className="h-48 bg-gray-100 overflow-hidden">
-                        <img 
-                          src={mainImage} 
-                          alt={installment.productName || 'Product'}
-                          className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
-                        />
-                      </div>
-                    )}
+                  return (
+                    <div
+                      key={listId}
+                      className="glass-red rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
+                    >
+                      {mainImage && (
+                        <div className="h-48 bg-gray-100 overflow-hidden">
+                          <img
+                            src={mainImage}
+                            alt={installment.productName || 'Product'}
+                            className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
+                      )}
 
-                    <div className="p-6">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-bold text-gray-800 line-clamp-2 mb-1">
-                            {installment.productName || 'Installment Plan'}
-                          </h3>
-                          {installment.category && (
-                            <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded">
-                              {installment.category}
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-bold text-gray-800 line-clamp-2 mb-1">
+                              {installment.productName || 'Installment Plan'}
+                            </h3>
+                            {categoryLabel && (
+                              <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded">
+                                {categoryLabel}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
+                            <span
+                              className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
+                                isOwner ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {isOwner ? 'Your listing' : 'Shared · your plans'}
                             </span>
+                            <span
+                              className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
+                                installment.status === 'active' || installment.status === 'approved'
+                                  ? 'bg-green-100 text-green-700'
+                                  : installment.status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {installment.status || 'Active'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded px-2 py-1.5 mb-3 flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span>
+                            {isOwner ? 'Created by you' : 'Listed by'}:{' '}
+                            <strong className="text-gray-800">{creatorLabel}</strong>
+                          </span>
+                        </p>
+
+                        {installment.description && (
+                          <p className="text-sm text-gray-600 mb-4 line-clamp-2">{installment.description}</p>
+                        )}
+
+                        <div className="space-y-3">
+                          {installment.price > 0 && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <DollarSign className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-600">Product price:</span>
+                              <span className="font-semibold text-gray-800">
+                                ₨ {Number(installment.price).toLocaleString()}
+                              </span>
+                            </div>
                           )}
-                        </div>
-                        <div className="flex flex-col items-end gap-1 ml-2">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
-                            isOwner ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'
-                          }`}>
-                            {isOwner ? 'Your listing' : 'Shared  your plans'}
-                          </span>
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
-                            installment.status === 'active' || installment.status === 'approved'
-                              ? 'bg-green-100 text-green-700'
-                              : installment.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {installment.status || 'Active'}
-                          </span>
-                        </div>
-                      </div>
 
-                      {!isOwner && installment.ownerCompanyName && (
-                        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1 mb-3">
-                          Listed by: {installment.ownerCompanyName}
-                        </p>
-                      )}
-
-                      {installment.description && (
-                        <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                          {installment.description}
-                        </p>
-                      )}
-
-                      <div className="space-y-3">
-                        {installment.price > 0 && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <DollarSign className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">Product price:</span>
-                            <span className="font-semibold text-gray-800">
-                              ₨ {Number(installment.price).toLocaleString()}
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-2 text-sm">
-                          <FileText className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-600">Your plans:</span>
-                          <span className="font-semibold text-blue-700">{myCount}</span>
-                        </div>
-
-                        {preview?.monthlyInstallment > 0 && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">{preview.planName || 'Your plan'}:</span>
-                            <span className="font-semibold text-gray-800">
-                              ₨ {Number(preview.monthlyInstallment).toLocaleString()}/mo
-                            </span>
-                          </div>
-                        )}
-
-                        {installment.city && (
                           <div className="flex items-center gap-2 text-sm">
                             <FileText className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">City:</span>
-                            <span className="font-semibold text-gray-800">
-                              {installment.city}
-                            </span>
+                            <span className="text-gray-600">Your plans:</span>
+                            <span className="font-semibold text-blue-700">{myCount}</span>
                           </div>
-                        )}
 
-                        {myCount > 1 && (
-                          <div className="pt-2">
-                            <span className="text-xs text-blue-600 font-medium">
-                              +{myCount - 1} more of your plan{myCount > 2 ? 's' : ''}
-                            </span>
-                          </div>
-                        )}
-
-                        {installment.createdAt && (
-                          <div className="pt-3 border-t border-gray-200">
-                            <p className="text-xs text-gray-500">
-                              Created: {new Date(installment.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className={`mt-4 grid gap-2 ${isOwner ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                        <button
-                          onClick={() => navigate(`/installments/view/${encodeURIComponent(listId)}`)}
-                          className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        
-                        <button
-                          onClick={() => navigate(`/installments/edit/${encodeURIComponent(listId)}`)}
-                          className="flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                          title={isOwner ? 'Edit listing' : 'Manage your plans'}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        
-                        {isOwner && (
-                        <button
-                          onClick={() => handleDelete(installment)}
-                          disabled={deleteLoading === listId}
-                          className="flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Delete entire listing"
-                        >
-                          {deleteLoading === listId ? (
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
+                          {preview?.monthlyInstallment > 0 && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-600">{preview.planName || 'Your plan'}:</span>
+                              <span className="font-semibold text-gray-800">
+                                ₨ {Number(preview.monthlyInstallment).toLocaleString()}/mo
+                              </span>
+                            </div>
                           )}
-                        </button>
-                        )}
+
+                          {installment.city && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <MapPin className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-600">City:</span>
+                              <span className="font-semibold text-gray-800">{installment.city}</span>
+                            </div>
+                          )}
+
+                          {listId && (
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span className="font-mono truncate">ID: {listId}</span>
+                            </div>
+                          )}
+
+                          {myCount > 1 && (
+                            <div className="pt-2">
+                              <span className="text-xs text-blue-600 font-medium">
+                                +{myCount - 1} more of your plan{myCount > 2 ? 's' : ''}
+                              </span>
+                            </div>
+                          )}
+
+                          {installment.createdAt && (
+                            <div className="pt-3 border-t border-gray-200">
+                              <p className="text-xs text-gray-500">
+                                Created: {new Date(installment.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className={`mt-4 grid gap-2 ${isOwner ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/installments/view/${encodeURIComponent(listId)}`)}
+                            className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/installments/edit/${encodeURIComponent(listId)}`)}
+                            className="flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                            title={isOwner ? 'Edit listing' : 'Manage your plans'}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+
+                          {isOwner && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(installment)}
+                              disabled={deleteLoading === listId}
+                              className="flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Delete entire listing"
+                            >
+                              {deleteLoading === listId ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </>
         )}
       </main>
@@ -354,4 +688,3 @@ const InstallmentsList = () => {
 };
 
 export default InstallmentsList;
-

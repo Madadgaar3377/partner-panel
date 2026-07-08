@@ -48,31 +48,17 @@ const CityMultiSelect = ({
     <div className={`space-y-3 ${className}`}>
       {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
+      <div className="space-y-2">
+        <label className="block text-xs font-medium text-gray-500">City scope</label>
+        <select
+          value={cityScope}
           disabled={disabled}
-          onClick={() => setScope('all')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-            cityScope === 'all'
-              ? 'bg-red-600 text-white border-red-600'
-              : 'bg-white text-gray-700 border-gray-300 hover:border-red-400'
-          } disabled:opacity-60 disabled:cursor-not-allowed`}
+          onChange={(e) => setScope(e.target.value)}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
         >
-          {ALL_CITIES_LABEL}
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setScope('selected')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
-            cityScope === 'selected'
-              ? 'bg-red-600 text-white border-red-600'
-              : 'bg-white text-gray-700 border-gray-300 hover:border-red-400'
-          } disabled:opacity-60 disabled:cursor-not-allowed`}
-        >
-          Select Cities
-        </button>
+          <option value="all">{ALL_CITIES_LABEL}</option>
+          <option value="selected">Select Cities</option>
+        </select>
       </div>
 
       {disabled ? (

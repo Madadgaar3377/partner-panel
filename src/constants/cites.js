@@ -97,22 +97,101 @@ const cities = [
 const INVALID_CITY_VALUES = new Set([
   'pakistan',
   'paksitan',
+  'all city',
+  'all pakistan',
+]);
+
+export const ALL_CITIES_LABEL = 'All Cities';
+
+const ALL_CITIES_ALIASES = new Set([
   'all cities',
   'all city',
   'all pakistan',
+  'pakistan',
+  'paksitan',
 ]);
 
 const cityLookup = new Map(
   cities.map((city) => [city.value.toLowerCase(), city.value])
 );
 
+const isAllCitiesValue = (raw) => {
+  const key = String(raw || '').trim().toLowerCase();
+  return !key || ALL_CITIES_ALIASES.has(key);
+};
+
 /** Map messy stored values to a canonical city name, or empty if not a real city. */
 export const resolveCityValue = (raw) => {
   const trimmed = (raw || '').trim();
   if (!trimmed) return '';
   const key = trimmed.toLowerCase();
-  if (INVALID_CITY_VALUES.has(key)) return '';
+  if (INVALID_CITY_VALUES.has(key) || ALL_CITIES_ALIASES.has(key)) return '';
   return cityLookup.get(key) || trimmed;
+};
+
+export const parseInstallmentCities = (item = {}) => {
+  if (Array.isArray(item.cities) && item.cities.length > 0) {
+    const list = item.cities.map(resolveCityValue).filter(Boolean);
+    return {
+      cityScope: 'selected',
+      cities: list,
+      display: list.join(', '),
+      isAllCities: false,
+    };
+  }
+
+  const raw = String(item.city || '').trim();
+  if (!raw || isAllCitiesValue(raw)) {
+    return {
+      cityScope: 'all',
+      cities: [],
+      display: ALL_CITIES_LABEL,
+      isAllCities: true,
+    };
+  }
+
+  if (raw.includes(',')) {
+    const list = raw.split(',').map((s) => resolveCityValue(s.trim())).filter(Boolean);
+    return {
+      cityScope: 'selected',
+      cities: list,
+      display: list.join(', '),
+      isAllCities: false,
+    };
+  }
+
+  const one = resolveCityValue(raw) || raw;
+  return {
+    cityScope: 'selected',
+    cities: one ? [one] : [],
+    display: one || ALL_CITIES_LABEL,
+    isAllCities: false,
+  };
+};
+
+export const serializeInstallmentCities = (cityScope, selectedCities = []) => {
+  if (cityScope === 'all') {
+    return { city: ALL_CITIES_LABEL, cities: [], cityScope: 'all' };
+  }
+  const list = [...new Set((selectedCities || []).map(resolveCityValue).filter(Boolean))];
+  if (!list.length) {
+    return { city: ALL_CITIES_LABEL, cities: [], cityScope: 'all' };
+  }
+  return {
+    city: list.length === 1 ? list[0] : list.join(', '),
+    cities: list,
+    cityScope: 'selected',
+  };
+};
+
+export const formatInstallmentCityDisplay = (item) => parseInstallmentCities(item).display;
+
+export const installmentMatchesCityFilter = (item, filterCity) => {
+  if (!filterCity || filterCity === 'All') return true;
+  const parsed = parseInstallmentCities(item);
+  if (parsed.isAllCities) return true;
+  const needle = filterCity.toLowerCase();
+  return parsed.cities.some((c) => c.toLowerCase() === needle);
 };
 
 export const cityMatchesFilter = (itemCity, filterCity) => {

@@ -1,5 +1,6 @@
 import { CATEGORY_SPECIFICATIONS } from '../constants/productCategories';
 import baseApi from '../constants/apiUrl';
+import { parseInstallmentCities } from '../constants/cites';
 
 /** Whole PKR amounts — avoids 39999 → 39997 float drift */
 export const roundPKR = (value) => {
@@ -552,10 +553,14 @@ export const mapInstallmentPlanToForm = (plan, partnerUserId) => {
         : roundPKR(price)
       : "";
 
+  const cityFields = parseInstallmentCities(plan);
+
   return {
     userId: partnerUserId || "",
     productName: plan.productName || "",
-    city: plan.city || "",
+    city: cityFields.display,
+    cityScope: cityFields.cityScope,
+    cities: cityFields.cities,
     price,
     discountedPrice,
     discountPercent,
@@ -908,22 +913,34 @@ export const buildInstallmentUpdateBody = ({
       paymentPlans: rootPlans,
       variants: variantsPayload,
     };
+
+    const variantPricing = buildPartnerVariantPricing(variantsForSave);
+    const basePrice = roundPKR(form.partnerBasePrice || form.price);
+
+    if (variantPricing.length > 0) {
+      body.partnerVariantPricing = variantPricing;
+    }
+    if (basePrice > 0) {
+      body.partnerBasePrice = basePrice;
+    }
     if (!installmentsOnly) {
-      body.partnerBasePrice = roundPKR(form.partnerBasePrice || form.price);
-      body.partnerVariantPricing = buildPartnerVariantPricing(variantsForSave);
       body.partnerOwnedVariants = buildPartnerOwnedVariantsPayload(variantsForSave);
     }
+
     return body;
   }
 
   const category =
     form.category === "other" ? form.customCategory || form.category : form.category;
+  const cityFields = parseInstallmentCities(form);
 
   return {
     userId: editorUserId || form.userId,
     mergePartnerPlans: true,
     productName: form.productName,
-    city: form.city,
+    city: cityFields.display,
+    cities: cityFields.cities,
+    cityScope: cityFields.cityScope,
     price: productPrice,
     downpayment: Number(form.downpayment) || 0,
     installment: form.installment !== "" && form.installment != null ? Number(form.installment) : undefined,
@@ -982,9 +999,12 @@ export const submitInstallmentPlanUpdate = async ({
     if (!isAttachedProduct) {
       const category =
         form.category === "other" ? form.customCategory || form.category : form.category;
+      const cityFields = parseInstallmentCities(form);
       Object.assign(patch, {
         productName: form.productName,
-        city: form.city,
+        city: cityFields.display,
+        cities: cityFields.cities,
+        cityScope: cityFields.cityScope,
         description: form.description || "",
         companyName: form.companyName || "",
         companyNameOther: form.companyNameOther || "",

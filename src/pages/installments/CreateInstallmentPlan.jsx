@@ -12,7 +12,8 @@ import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 import SearchableProductSelect from '../../components/SearchableProductSelect';
-import CitySelect from '../../components/CitySelect';
+import CityMultiSelect from '../../components/CityMultiSelect';
+import { parseInstallmentCities } from '../../constants/cites';
 import {
   PartnerStep4Tabs,
   ProductFinancePanel,
@@ -69,6 +70,8 @@ const CreateInstallmentPlan = () => {
         userId: "",
         productName: "",
         city: "",
+        cityScope: "all",
+        cities: [],
         price: "",
         discountedPrice: "",
         discountPercent: 0,
@@ -138,6 +141,8 @@ const CreateInstallmentPlan = () => {
                 ...prev,
                 productName: "",
                 city: "",
+                cityScope: "all",
+                cities: [],
                 price: "",
                 partnerBasePrice: "",
                 downpayment: "",
@@ -162,10 +167,13 @@ const CreateInstallmentPlan = () => {
             setExistingPlans(collectPartnerPlans(product, prev.userId));
             const partnerEntry = getPartnerPricingEntry(product, prev.userId);
             const partnerPrice = partnerEntry?.basePrice ?? "";
+            const cityFields = parseInstallmentCities(product);
             return {
                 ...prev,
                 productName: product.productName || "",
-                city: product.city || "",
+                city: cityFields.display,
+                cityScope: cityFields.cityScope,
+                cities: cityFields.cities,
                 price: partnerPrice || "",
                 partnerBasePrice: partnerPrice || "",
                 downpayment: product.downpayment || "",
@@ -527,7 +535,13 @@ const CreateInstallmentPlan = () => {
     };
 
     const isStepValid = () => {
-        if (step === 1) return form.productName && form.city && form.category;
+        if (step === 1) {
+            return (
+                form.productName &&
+                form.category &&
+                (form.cityScope === 'all' || (form.cities && form.cities.length > 0))
+            );
+        }
         if (step === 3 && !selectedProductId) return form.productImages.length > 0;
         if (step === 4) {
             if (isFinanceOnlyStep(step4Tab)) {
@@ -718,9 +732,17 @@ const CreateInstallmentPlan = () => {
                                     readOnly={!!selectedProductId}
                                 />
                                 
-                                <CitySelect
-                                    value={form.city}
-                                    onChange={(v) => updateForm('city', v)}
+                                <CityMultiSelect
+                                    cityScope={form.cityScope || 'all'}
+                                    cities={form.cities || []}
+                                    onChange={(payload) =>
+                                        setForm((prev) => ({
+                                            ...prev,
+                                            city: payload.city,
+                                            cityScope: payload.cityScope,
+                                            cities: payload.cities,
+                                        }))
+                                    }
                                     disabled={!!selectedProductId}
                                 />
 

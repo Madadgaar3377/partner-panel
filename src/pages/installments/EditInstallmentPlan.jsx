@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
-import CitySelect from '../../components/CitySelect';
+import CityMultiSelect from '../../components/CityMultiSelect';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 import {
@@ -51,6 +51,8 @@ const EditInstallmentPlan = () => {
     userId: "",
     productName: "",
     city: "",
+    cityScope: "all",
+    cities: [],
     price: "",
     discountedPrice: "",
     discountPercent: 0,
@@ -320,7 +322,13 @@ const EditInstallmentPlan = () => {
   };
 
   const isStepValid = () => {
-    if (step === 1) return form.productName && form.city && form.category;
+    if (step === 1) {
+      return (
+        form.productName &&
+        form.category &&
+        (form.cityScope === 'all' || (form.cities && form.cities.length > 0))
+      );
+    }
     if (step === 3 && !fieldsLocked) return form.productImages.length > 0;
     if (step === 4) {
       if (isFinanceOnlyStep(step4Tab)) {
@@ -519,11 +527,18 @@ const EditInstallmentPlan = () => {
                   readOnly={fieldsLocked}
                 />
                 
-                <CitySelect
-                  value={form.city}
-                  onChange={(v) => updateForm('city', v)}
+                <CityMultiSelect
+                  cityScope={form.cityScope || 'all'}
+                  cities={form.cities || []}
+                  onChange={(payload) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      city: payload.city,
+                      cityScope: payload.cityScope,
+                      cities: payload.cities,
+                    }))
+                  }
                   disabled={fieldsLocked}
-                  allowLegacyValue
                 />
 
                 <div className="space-y-2">

@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import { PageLoader } from '../../components/Loader';
 import baseApi from '../../constants/apiUrl';
-import cities, { cityMatchesFilter, resolveCityValue } from '../../constants/cites';
+import cities, { installmentMatchesCityFilter, formatInstallmentCityDisplay } from '../../constants/cites';
 import { PRODUCT_CATEGORIES } from '../../constants/productCategories';
 
 const CATEGORY_LABELS = Object.fromEntries(
@@ -60,6 +60,7 @@ const getSearchBlob = (item) => {
     item.category,
     item.customCategory,
     item.city,
+    ...(Array.isArray(item.cities) ? item.cities : []),
     item.companyName,
     item.companyNameOther,
     item.ownerCompanyName,
@@ -178,7 +179,7 @@ const InstallmentsList = () => {
       const cat = item.category || item.customCategory || '';
       if (filterCategory !== 'All' && cat !== filterCategory) return false;
 
-      if (!cityMatchesFilter(item.city, filterCity)) return false;
+      if (!installmentMatchesCityFilter(item, filterCity)) return false;
 
       const status = (item.status || 'active').toLowerCase();
       if (filterStatus !== 'All' && status !== filterStatus.toLowerCase()) return false;
@@ -606,12 +607,12 @@ const InstallmentsList = () => {
                             </div>
                           )}
 
-                          {resolveCityValue(installment.city) && (
+                          {formatInstallmentCityDisplay(installment) && (
                             <div className="flex items-center gap-2 text-sm">
                               <MapPin className="w-4 h-4 text-gray-400" />
                               <span className="text-gray-600">City:</span>
                               <span className="font-semibold text-gray-800">
-                                {resolveCityValue(installment.city)}
+                                {formatInstallmentCityDisplay(installment)}
                               </span>
                             </div>
                           )}

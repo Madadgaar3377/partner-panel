@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import { PageLoader } from '../../components/Loader';
 import baseApi from '../../constants/apiUrl';
+import cities, { cityMatchesFilter, resolveCityValue } from '../../constants/cites';
 import { PRODUCT_CATEGORIES } from '../../constants/productCategories';
 
 const CATEGORY_LABELS = Object.fromEntries(
@@ -132,21 +133,18 @@ const InstallmentsList = () => {
 
   const filterOptions = useMemo(() => {
     const categories = new Set();
-    const cities = new Set();
     const statuses = new Set();
     const creators = new Set();
 
     installments.forEach((item) => {
       const cat = item.category || item.customCategory;
       if (cat) categories.add(cat);
-      if (item.city) cities.add(item.city);
       if (item.status) statuses.add(item.status);
       creators.add(getCreatorLabel(item));
     });
 
     return {
       categories: Array.from(categories).sort(),
-      cities: Array.from(cities).sort(),
       statuses: Array.from(statuses).sort(),
       creators: Array.from(creators).sort(),
     };
@@ -180,7 +178,7 @@ const InstallmentsList = () => {
       const cat = item.category || item.customCategory || '';
       if (filterCategory !== 'All' && cat !== filterCategory) return false;
 
-      if (filterCity !== 'All' && item.city !== filterCity) return false;
+      if (!cityMatchesFilter(item.city, filterCity)) return false;
 
       const status = (item.status || 'active').toLowerCase();
       if (filterStatus !== 'All' && status !== filterStatus.toLowerCase()) return false;
@@ -381,10 +379,10 @@ const InstallmentsList = () => {
                       onChange={(e) => setFilterCity(e.target.value)}
                       className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="All">All cities</option>
-                      {filterOptions.cities.map((city) => (
-                        <option key={city} value={city}>
-                          {city}
+                      <option value="All">All Cities</option>
+                      {cities.map((city) => (
+                        <option key={city.value} value={city.value}>
+                          {city.title}
                         </option>
                       ))}
                     </select>
@@ -608,11 +606,13 @@ const InstallmentsList = () => {
                             </div>
                           )}
 
-                          {installment.city && (
+                          {resolveCityValue(installment.city) && (
                             <div className="flex items-center gap-2 text-sm">
                               <MapPin className="w-4 h-4 text-gray-400" />
                               <span className="text-gray-600">City:</span>
-                              <span className="font-semibold text-gray-800">{installment.city}</span>
+                              <span className="font-semibold text-gray-800">
+                                {resolveCityValue(installment.city)}
+                              </span>
                             </div>
                           )}
 

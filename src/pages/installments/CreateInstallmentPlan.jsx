@@ -12,6 +12,7 @@ import Navbar from '../../components/Navbar';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 import SearchableProductSelect from '../../components/SearchableProductSelect';
+import CitySelect from '../../components/CitySelect';
 import {
   PartnerStep4Tabs,
   ProductFinancePanel,
@@ -717,12 +718,10 @@ const CreateInstallmentPlan = () => {
                                     readOnly={!!selectedProductId}
                                 />
                                 
-                                <InputField
-                                    label="City *"
+                                <CitySelect
                                     value={form.city}
-                                    onChange={v => updateForm('city', v)}
-                                    placeholder="e.g., Lahore"
-                                    readOnly={!!selectedProductId}
+                                    onChange={(v) => updateForm('city', v)}
+                                    disabled={!!selectedProductId}
                                 />
 
                                 <div className="space-y-2">

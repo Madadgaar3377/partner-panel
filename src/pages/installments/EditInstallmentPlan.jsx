@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
+import CitySelect from '../../components/CitySelect';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 import {
@@ -518,12 +519,11 @@ const EditInstallmentPlan = () => {
                   readOnly={fieldsLocked}
                 />
                 
-                <InputField
-                  label="City *"
+                <CitySelect
                   value={form.city}
-                  onChange={v => updateForm('city', v)}
-                  placeholder="e.g., Lahore"
-                  readOnly={fieldsLocked}
+                  onChange={(v) => updateForm('city', v)}
+                  disabled={fieldsLocked}
+                  allowLegacyValue
                 />
 
                 <div className="space-y-2">

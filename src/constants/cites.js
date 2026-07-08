@@ -1,5 +1,5 @@
-const cities =[
-    { value: 'Karachi', title: 'Karachi' },
+const cities = [
+  { value: 'Karachi', title: 'Karachi' },
   { value: 'Lahore', title: 'Lahore' },
   { value: 'Faisalabad', title: 'Faisalabad' },
   { value: 'Rawalpindi', title: 'Rawalpindi' },
@@ -90,10 +90,35 @@ const cities =[
   { value: 'Toba Tek Singh', title: 'Toba Tek Singh' },
   { value: 'Narowal', title: 'Narowal' },
   { value: 'Bhakkar', title: 'Bhakkar' },
-  { value: 'Khushab', title: 'Khushab' },
-  { value: 'Hafizabad', title: 'Hafizabad' },
   { value: 'Kotli', title: 'Kotli' },
   { value: 'Sialkot Cantonment', title: 'Sialkot Cantonment' },
-]
+];
+
+const INVALID_CITY_VALUES = new Set([
+  'pakistan',
+  'paksitan',
+  'all cities',
+  'all city',
+  'all pakistan',
+]);
+
+const cityLookup = new Map(
+  cities.map((city) => [city.value.toLowerCase(), city.value])
+);
+
+/** Map messy stored values to a canonical city name, or empty if not a real city. */
+export const resolveCityValue = (raw) => {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+  const key = trimmed.toLowerCase();
+  if (INVALID_CITY_VALUES.has(key)) return '';
+  return cityLookup.get(key) || trimmed;
+};
+
+export const cityMatchesFilter = (itemCity, filterCity) => {
+  if (!filterCity || filterCity === 'All') return true;
+  const resolved = resolveCityValue(itemCity);
+  return resolved.toLowerCase() === filterCity.toLowerCase();
+};
 
 export default cities;

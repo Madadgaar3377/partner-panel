@@ -33,6 +33,12 @@ const CityMultiSelect = ({
       onChange(serializeInstallmentCities('all', []));
       return;
     }
+    // IMPORTANT: allow opening "Select Cities" even when nothing is selected yet.
+    // We'll enforce "at least one city" at form validation time.
+    if (!selectedCities || selectedCities.length === 0) {
+      onChange({ city: '', cities: [], cityScope: 'selected' });
+      return;
+    }
     onChange(serializeInstallmentCities('selected', selectedCities));
   };
 

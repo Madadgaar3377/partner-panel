@@ -21,6 +21,12 @@ import { PageLoader } from '../../components/Loader';
 import baseApi from '../../constants/apiUrl';
 import cities, { installmentMatchesCityFilter, formatInstallmentCityDisplay } from '../../constants/cites';
 import { PRODUCT_CATEGORIES } from '../../constants/productCategories';
+import InstallmentStatusBadges from '../../components/installment/InstallmentStatusBadges';
+import {
+  LIST_STATUS_FILTER_OPTIONS,
+  countByStatusFilter,
+  matchesInstallmentStatusFilter,
+} from '../../utils/installmentStatus';
 
 const CATEGORY_LABELS = Object.fromEntries(
   PRODUCT_CATEGORIES.map((c) => [c.value, c.label])
@@ -134,22 +140,30 @@ const InstallmentsList = () => {
 
   const filterOptions = useMemo(() => {
     const categories = new Set();
-    const statuses = new Set();
     const creators = new Set();
 
     installments.forEach((item) => {
       const cat = item.category || item.customCategory;
       if (cat) categories.add(cat);
-      if (item.status) statuses.add(item.status);
       creators.add(getCreatorLabel(item));
     });
 
     return {
       categories: Array.from(categories).sort(),
-      statuses: Array.from(statuses).sort(),
       creators: Array.from(creators).sort(),
     };
   }, [installments]);
+
+  const statusCounts = useMemo(
+    () => ({
+      in_stock: countByStatusFilter(installments, 'in_stock'),
+      out_of_stock: countByStatusFilter(installments, 'out_of_stock'),
+      approved: countByStatusFilter(installments, 'approved'),
+      pending: countByStatusFilter(installments, 'pending'),
+      drafted: countByStatusFilter(installments, 'drafted'),
+    }),
+    [installments]
+  );
 
   const hasActiveFilters =
     searchTerm.trim() !== '' ||
@@ -181,8 +195,7 @@ const InstallmentsList = () => {
 
       if (!installmentMatchesCityFilter(item, filterCity)) return false;
 
-      const status = (item.status || 'active').toLowerCase();
-      if (filterStatus !== 'All' && status !== filterStatus.toLowerCase()) return false;
+      if (!matchesInstallmentStatusFilter(item, filterStatus)) return false;
 
       if (filterListingType === 'owner' && !isOwnerListing(item)) return false;
       if (filterListingType === 'shared' && isOwnerListing(item)) return false;
@@ -355,6 +368,37 @@ const InstallmentsList = () => {
                 />
               </div>
 
+              <div className="flex flex-wrap gap-2 mb-4">
+                {[
+                  { value: 'All', label: 'All', count: installments.length },
+                  { value: 'in_stock', label: 'In Stock', count: statusCounts.in_stock },
+                  { value: 'out_of_stock', label: 'Out of Stock', count: statusCounts.out_of_stock },
+                  { value: 'approved', label: 'Approved', count: statusCounts.approved },
+                  { value: 'pending', label: 'Pending', count: statusCounts.pending },
+                  { value: 'drafted', label: 'Drafted', count: statusCounts.drafted },
+                ].map((chip) => (
+                  <button
+                    key={chip.value}
+                    type="button"
+                    onClick={() => setFilterStatus(chip.value)}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                      filterStatus === chip.value
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:text-blue-700'
+                    }`}
+                  >
+                    <span>{chip.label}</span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                        filterStatus === chip.value ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {chip.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
               {showFilters && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                   <div>
@@ -396,10 +440,9 @@ const InstallmentsList = () => {
                       onChange={(e) => setFilterStatus(e.target.value)}
                       className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="All">All statuses</option>
-                      {filterOptions.statuses.map((status) => (
-                        <option key={status} value={status}>
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                      {LIST_STATUS_FILTER_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
@@ -453,7 +496,7 @@ const InstallmentsList = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
               <div className="glass-red rounded-xl p-6 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
@@ -495,6 +538,28 @@ const InstallmentsList = () => {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+              {[
+                { key: 'in_stock', label: 'In Stock', count: statusCounts.in_stock, className: 'from-sky-50 to-white border-sky-100 text-sky-700' },
+                { key: 'out_of_stock', label: 'Out of Stock', count: statusCounts.out_of_stock, className: 'from-rose-50 to-white border-rose-100 text-rose-700' },
+                { key: 'approved', label: 'Approved', count: statusCounts.approved, className: 'from-emerald-50 to-white border-emerald-100 text-emerald-700' },
+                { key: 'pending', label: 'Pending', count: statusCounts.pending, className: 'from-amber-50 to-white border-amber-100 text-amber-700' },
+                { key: 'drafted', label: 'Drafted', count: statusCounts.drafted, className: 'from-slate-50 to-white border-slate-200 text-slate-700' },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setFilterStatus(item.key)}
+                  className={`rounded-xl border bg-gradient-to-br p-4 text-left transition-all hover:shadow-md ${
+                    item.className
+                  } ${filterStatus === item.key ? 'ring-2 ring-blue-500 shadow-md' : ''}`}
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{item.label}</p>
+                  <p className="text-2xl font-bold mt-1">{item.count}</p>
+                </button>
+              ))}
+            </div>
+
             {filteredInstallments.length === 0 ? (
               <div className="glass-red rounded-xl shadow-lg p-8 text-center">
                 <Search className="w-14 h-14 text-gray-300 mx-auto mb-4" />
@@ -525,12 +590,35 @@ const InstallmentsList = () => {
                       className="glass-red rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
                     >
                       {mainImage && (
-                        <div className="h-48 bg-gray-100 overflow-hidden">
+                        <div className="relative h-48 bg-gray-100 overflow-hidden">
                           <img
                             src={mainImage}
                             alt={installment.productName || 'Product'}
                             className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
                           />
+                          <div className="absolute inset-x-0 top-0 p-3 flex flex-wrap items-start justify-between gap-2 bg-gradient-to-b from-black/45 to-transparent">
+                            <InstallmentStatusBadges item={installment} size="sm" />
+                            <span
+                              className={`px-2 py-1 text-[10px] font-semibold rounded-full whitespace-nowrap backdrop-blur-sm ${
+                                isOwner ? 'bg-green-500/90 text-white' : 'bg-amber-500/90 text-white'
+                              }`}
+                            >
+                              {isOwner ? 'Your listing' : 'Shared'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {!mainImage && (
+                        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-wrap items-center justify-between gap-2">
+                          <InstallmentStatusBadges item={installment} size="sm" />
+                          <span
+                            className={`px-2 py-1 text-[10px] font-semibold rounded-full whitespace-nowrap ${
+                              isOwner ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {isOwner ? 'Your listing' : 'Shared'}
+                          </span>
                         </div>
                       )}
 
@@ -553,17 +641,6 @@ const InstallmentsList = () => {
                               }`}
                             >
                               {isOwner ? 'Your listing' : 'Shared · your plans'}
-                            </span>
-                            <span
-                              className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
-                                installment.status === 'active' || installment.status === 'approved'
-                                  ? 'bg-green-100 text-green-700'
-                                  : installment.status === 'pending'
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-gray-100 text-gray-700'
-                              }`}
-                            >
-                              {installment.status || 'Active'}
                             </span>
                           </div>
                         </div>

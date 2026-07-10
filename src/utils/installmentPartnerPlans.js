@@ -1,6 +1,7 @@
 import { CATEGORY_SPECIFICATIONS } from '../constants/productCategories';
 import baseApi from '../constants/apiUrl';
 import { parseInstallmentCities } from '../constants/cites';
+import { normalizeApprovalStatus, normalizeStockStatus } from './installmentStatus';
 
 /** Whole PKR amounts — avoids 39999 → 39997 float drift */
 export const roundPKR = (value) => {
@@ -561,6 +562,8 @@ export const mapInstallmentPlanToForm = (plan, partnerUserId) => {
     city: cityFields.display,
     cityScope: cityFields.cityScope,
     cities: cityFields.cities,
+    status: normalizeApprovalStatus(plan.status),
+    stockStatus: normalizeStockStatus(plan.stockStatus),
     price,
     discountedPrice,
     discountPercent,
@@ -954,6 +957,7 @@ export const buildInstallmentUpdateBody = ({
     category,
     customCategory: form.customCategory || "",
     status: form.status || "pending",
+    stockStatus: form.stockStatus || "in_stock",
     productImages: form.productImages || [],
     productSpecifications: form.productSpecifications || {},
     finance: form.finance || {},
@@ -1014,6 +1018,7 @@ export const submitInstallmentPlanUpdate = async ({
         productImages: form.productImages || [],
         productSpecifications: form.productSpecifications || {},
         status: form.status || "pending",
+        stockStatus: form.stockStatus || "in_stock",
       });
     }
 

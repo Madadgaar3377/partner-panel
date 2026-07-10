@@ -15,6 +15,10 @@ import SearchableProductSelect from '../../components/SearchableProductSelect';
 import CityMultiSelect from '../../components/CityMultiSelect';
 import { parseInstallmentCities } from '../../constants/cites';
 import {
+  APPROVAL_STATUS_OPTIONS,
+  STOCK_STATUS_OPTIONS,
+} from '../../utils/installmentStatus';
+import {
   PartnerStep4Tabs,
   ProductFinancePanel,
   planPayloadWithFinance,
@@ -88,6 +92,7 @@ const CreateInstallmentPlan = () => {
         category: "",
         customCategory: "",
         status: "approved",
+        stockStatus: "in_stock",
         productImages: [],
         paymentPlans: [],
 
@@ -745,6 +750,34 @@ const CreateInstallmentPlan = () => {
                                     }
                                     disabled={!!selectedProductId}
                                 />
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-gray-700">Listing Status</label>
+                                    <select
+                                        value={form.status || 'approved'}
+                                        onChange={(e) => updateForm('status', e.target.value)}
+                                        disabled={!!selectedProductId}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
+                                    >
+                                        {APPROVAL_STATUS_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-gray-700">Stock Status</label>
+                                    <select
+                                        value={form.stockStatus || 'in_stock'}
+                                        onChange={(e) => updateForm('stockStatus', e.target.value)}
+                                        disabled={!!selectedProductId}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
+                                    >
+                                        {STOCK_STATUS_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
 
                                 <div className="space-y-2">
                                     <label className="block text-sm font-medium text-gray-700">

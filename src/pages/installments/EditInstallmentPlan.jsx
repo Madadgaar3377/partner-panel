@@ -10,6 +10,11 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import CityMultiSelect from '../../components/CityMultiSelect';
+import {
+  APPROVAL_STATUS_OPTIONS,
+  STOCK_STATUS_OPTIONS,
+  normalizeApprovalStatus,
+} from '../../utils/installmentStatus';
 import baseApi from '../../constants/apiUrl';
 import { CATEGORY_SPECIFICATIONS, getGroupedCategories } from '../../constants/productCategories';
 import {
@@ -69,6 +74,7 @@ const EditInstallmentPlan = () => {
     category: "",
     customCategory: "",
     status: "pending",
+    stockStatus: "in_stock",
     productImages: [],
     paymentPlans: [],
     productSpecifications: {
@@ -540,6 +546,34 @@ const EditInstallmentPlan = () => {
                   }
                   disabled={fieldsLocked}
                 />
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Listing Status</label>
+                  <select
+                    value={normalizeApprovalStatus(form.status)}
+                    onChange={(e) => updateForm('status', e.target.value)}
+                    disabled={fieldsLocked}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
+                  >
+                    {APPROVAL_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">Stock Status</label>
+                  <select
+                    value={form.stockStatus || 'in_stock'}
+                    onChange={(e) => updateForm('stockStatus', e.target.value)}
+                    disabled={fieldsLocked}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
+                  >
+                    {STOCK_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
 
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700">

@@ -18,31 +18,31 @@ export const LIST_STATUS_FILTER_OPTIONS = [
 const APPROVAL_BADGES = {
   approved: {
     label: 'Approved',
-    className: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    dot: 'bg-emerald-500',
+    className: 'bg-red-600 text-white border-red-600',
+    dot: 'bg-white',
   },
   pending: {
     label: 'Pending',
-    className: 'bg-amber-100 text-amber-800 border-amber-200',
-    dot: 'bg-amber-500',
+    className: 'bg-red-100 text-red-800 border-red-200',
+    dot: 'bg-red-500',
   },
   drafted: {
     label: 'Drafted',
-    className: 'bg-slate-100 text-slate-700 border-slate-200',
-    dot: 'bg-slate-500',
+    className: 'bg-white text-gray-600 border-gray-300',
+    dot: 'bg-gray-400',
   },
 };
 
 const STOCK_BADGES = {
   in_stock: {
     label: 'In Stock',
-    className: 'bg-sky-100 text-sky-800 border-sky-200',
-    dot: 'bg-sky-500',
+    className: 'bg-red-50 text-red-700 border-red-200',
+    dot: 'bg-red-500',
   },
   out_of_stock: {
     label: 'Out of Stock',
-    className: 'bg-rose-100 text-rose-800 border-rose-200',
-    dot: 'bg-rose-500',
+    className: 'bg-white text-red-600 border-red-300',
+    dot: 'bg-red-300',
   },
 };
 

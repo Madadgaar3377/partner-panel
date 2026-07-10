@@ -89,11 +89,11 @@ const Dashboard = () => {
   const recentProperties = dashboardData?.recent?.recentProperties || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="partner-page">
       <Navbar />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="partner-container">
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-800 mb-2">
@@ -139,11 +139,11 @@ const Dashboard = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           {/* Total Installments */}
           <div className="glass-red rounded-xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+              <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-lg">
                 <FileText className="w-6 h-6 text-white" />
               </div>
               <span className="text-xs font-semibold text-gray-500 uppercase">Total</span>
@@ -152,11 +152,11 @@ const Dashboard = () => {
             <p className="text-sm text-gray-600">Installment Products</p>
             <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
               <p className="text-xs text-gray-600">
-                <span className="font-semibold text-blue-700">{ownedInstallments}</span> your listings
+                <span className="font-semibold text-red-700">{ownedInstallments}</span> your listings
               </p>
               {contributedInstallments > 0 && (
                 <p className="text-xs text-gray-600">
-                  <span className="font-semibold text-amber-700">{contributedInstallments}</span> shared (your plans on others&apos; products)
+                  <span className="font-semibold text-red-600">{contributedInstallments}</span> shared (your plans on others&apos; products)
                 </p>
               )}
             </div>
@@ -165,7 +165,7 @@ const Dashboard = () => {
           {/* Total Installment Requests */}
           <div className="glass-red rounded-xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg">
+              <div className="p-3 bg-gradient-to-br from-red-600 to-red-700 rounded-lg">
                 <Users className="w-6 h-6 text-white" />
               </div>
               <span className="text-xs font-semibold text-gray-500 uppercase">Requests</span>
@@ -180,7 +180,7 @@ const Dashboard = () => {
           {/* Total Properties */}
           <div className="glass-red rounded-xl p-6 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-lg">
+              <div className="p-3 bg-gradient-to-br from-red-500 to-red-700 rounded-lg">
                 <Home className="w-6 h-6 text-white" />
               </div>
               <span className="text-xs font-semibold text-gray-500 uppercase">Properties</span>
@@ -212,7 +212,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Recent Installments */}
           <div className="glass-red rounded-xl shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6">
+            <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 sm:p-6">
               <div className="flex items-center gap-3">
                 <FileText className="w-6 h-6 text-white" />
                 <h3 className="text-xl font-bold text-white">Recent Installment Plans</h3>
@@ -239,11 +239,11 @@ const Dashboard = () => {
                         </h4>
                         <div className="flex flex-col items-end gap-1">
                           {isContributor ? (
-                            <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
+                            <span className="px-2 py-1 bg-white/90 text-red-700 border border-red-200 text-xs rounded-full font-medium">
                               Shared
                             </span>
                           ) : (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                            <span className="px-2 py-1 bg-red-600 text-white text-xs rounded-full font-medium">
                               Your listing
                             </span>
                           )}
@@ -292,10 +292,10 @@ const Dashboard = () => {
 
           {/* Recent Properties */}
           <div className="glass-red rounded-xl shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-green-500 to-green-600 p-6">
+            <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 sm:p-6">
               <div className="flex items-center gap-3">
                 <Home className="w-6 h-6 text-white" />
-                <h3 className="text-xl font-bold text-white">Recent Properties</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-white">Recent Properties</h3>
               </div>
             </div>
             <div className="p-6">
@@ -305,7 +305,7 @@ const Dashboard = () => {
                     <div key={index} className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="font-semibold text-gray-800">{property.title || property.propertyName || 'Property'}</h4>
-                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                        <span className="px-2 py-1 bg-red-50 text-red-700 border border-red-100 text-xs rounded-full font-medium">
                           Listed
                         </span>
                       </div>

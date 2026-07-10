@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X, MapPin, Check } from 'lucide-react';
+import { X, MapPin } from 'lucide-react';
 import cities, {
   ALL_CITIES_LABEL,
   parseInstallmentCities,
@@ -33,8 +33,6 @@ const CityMultiSelect = ({
       onChange(serializeInstallmentCities('all', []));
       return;
     }
-    // IMPORTANT: allow opening "Select Cities" even when nothing is selected yet.
-    // We'll enforce "at least one city" at form validation time.
     if (!selectedCities || selectedCities.length === 0) {
       onChange({ city: '', cities: [], cityScope: 'selected' });
       return;
@@ -52,7 +50,7 @@ const CityMultiSelect = ({
 
   return (
     <div className={`space-y-3 ${className}`}>
-      {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
+      {label && <label className="block text-sm font-medium text-gray-800">{label}</label>}
 
       <div className="space-y-2">
         <label className="block text-xs font-medium text-gray-500">City scope</label>
@@ -60,7 +58,7 @@ const CityMultiSelect = ({
           value={cityScope}
           disabled={disabled}
           onChange={(e) => setScope(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
+          className="select-brand"
         >
           <option value="all">{ALL_CITIES_LABEL}</option>
           <option value="selected">Select Cities</option>
@@ -68,28 +66,28 @@ const CityMultiSelect = ({
       </div>
 
       {disabled ? (
-        <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600">
-          <MapPin className="inline w-4 h-4 mr-1.5 -mt-0.5" />
+        <div className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600">
+          <MapPin className="inline w-4 h-4 mr-1.5 -mt-0.5 text-red-600" />
           {parsed.display}
         </div>
       ) : cityScope === 'all' ? (
-        <p className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-          This plan will be shown for customers in <strong>all cities</strong> across Pakistan.
+        <p className="text-sm text-gray-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+          This plan will be shown for customers in <strong className="text-red-700">all cities</strong> across Pakistan.
         </p>
       ) : (
-        <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
-          <div className="p-3 border-b border-gray-200">
+        <div className="border border-red-100 rounded-xl overflow-hidden bg-white">
+          <div className="p-3 border-b border-red-50">
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search cities..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="input-brand"
             />
           </div>
 
           {selectedCities.length > 0 && (
-            <div className="flex flex-wrap gap-2 p-3 border-b border-gray-100 bg-red-50/50">
+            <div className="flex flex-wrap gap-2 p-3 border-b border-red-50 bg-red-50/60">
               {selectedCities.map((city) => (
                 <span
                   key={city}
@@ -109,7 +107,7 @@ const CityMultiSelect = ({
             </div>
           )}
 
-          <ul className="max-h-52 overflow-auto divide-y divide-gray-100">
+          <ul className="max-h-52 overflow-auto divide-y divide-red-50">
             {filtered.length === 0 ? (
               <li className="px-4 py-3 text-sm text-gray-500">No city found</li>
             ) : (
@@ -120,12 +118,11 @@ const CityMultiSelect = ({
                     <button
                       type="button"
                       onClick={() => toggleCity(city.value)}
-                      className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-red-50 ${
-                        checked ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-800'
+                      className={`w-full px-4 py-2.5 text-sm text-left hover:bg-red-50 ${
+                        checked ? 'bg-red-50 text-red-700 font-semibold' : 'text-gray-800'
                       }`}
                     >
-                      <span>{city.title}</span>
-                      {checked && <Check className="w-4 h-4 shrink-0" />}
+                      {city.title}
                     </button>
                   </li>
                 );
@@ -134,7 +131,7 @@ const CityMultiSelect = ({
           </ul>
 
           {selectedCities.length === 0 && (
-            <p className="px-4 py-3 text-xs text-amber-700 bg-amber-50 border-t border-amber-100">
+            <p className="px-4 py-3 text-xs text-red-700 bg-red-50 border-t border-red-100">
               Select at least one city, or switch to {ALL_CITIES_LABEL}.
             </p>
           )}

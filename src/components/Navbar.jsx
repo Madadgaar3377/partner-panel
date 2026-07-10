@@ -274,7 +274,7 @@ const Navbar = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-200 py-4 animate-in fade-in slide-in-from-top-2">
+          <div className="lg:hidden border-t border-red-100 py-4 max-h-[calc(100vh-4rem)] overflow-y-auto animate-in fade-in slide-in-from-top-2">
             {/* User Info */}
             <div className="flex items-center gap-3 px-4 py-3 mb-4 bg-red-50 rounded-lg">
               <div className="w-10 h-10 rounded-full overflow-hidden bg-red-200 flex items-center justify-center">

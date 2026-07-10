@@ -201,25 +201,59 @@ code {
     outline-none transition-all;
 }
 
-/* Badge Styles */
+/* Badge Styles — Madadgaar red & white brand */
 .badge {
   @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
 }
 
-.badge-success {
-  @apply bg-green-100 text-green-700;
-}
-
-.badge-warning {
-  @apply bg-yellow-100 text-yellow-700;
-}
-
-.badge-danger {
-  @apply bg-red-100 text-red-700;
-}
-
+.badge-success,
+.badge-warning,
+.badge-danger,
 .badge-info {
-  @apply bg-blue-100 text-blue-700;
+  @apply bg-red-50 text-red-700 border border-red-200;
+}
+
+.badge-solid {
+  @apply bg-red-600 text-white border border-red-600;
+}
+
+/* Partner panel layout */
+.partner-page {
+  @apply min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50;
+}
+
+.partner-container {
+  @apply max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8;
+}
+
+.chip-scroll {
+  @apply flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.chip-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.btn-brand {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl
+    hover:from-red-700 hover:to-red-800 transition-all shadow-md font-semibold text-sm sm:text-base;
+}
+
+.btn-brand-outline {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-red-600 border-2 border-red-600 rounded-xl
+    hover:bg-red-600 hover:text-white transition-all font-semibold text-sm;
+}
+
+.input-brand {
+  @apply w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white border border-gray-200 rounded-xl
+    focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-400 text-sm;
+}
+
+.select-brand {
+  @apply w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm
+    focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-400;
 }
 
 /* Responsive Utilities */

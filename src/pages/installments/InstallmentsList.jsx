@@ -284,14 +284,14 @@ const InstallmentsList = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="partner-page">
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Installment Plans</h1>
-            <p className="text-gray-600 mt-1">
+      <main className="partner-container">
+        <div className="flex flex-col gap-4 mb-4 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Installment Plans</h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-1">
               {installments.length > 0
                 ? `Showing ${filteredInstallments.length} of ${installments.length} plan${installments.length !== 1 ? 's' : ''}`
                 : 'Manage all your installment plans'}
@@ -300,7 +300,7 @@ const InstallmentsList = () => {
           <button
             type="button"
             onClick={() => navigate('/installments/create')}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg"
+            className="btn-brand w-full sm:w-auto shrink-0"
           >
             <Plus className="w-5 h-5" />
             Create Plan
@@ -322,7 +322,7 @@ const InstallmentsList = () => {
             <button
               type="button"
               onClick={() => navigate('/installments/create')}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg"
+              className="btn-brand"
             >
               Create First Plan
             </button>
@@ -330,13 +330,13 @@ const InstallmentsList = () => {
         ) : (
           <>
             {/* Search & filters */}
-            <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100 mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-blue-600" />
+            <div className="bg-white rounded-2xl p-3 sm:p-5 lg:p-6 shadow-lg border border-red-100 mb-4 sm:mb-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-red-600" />
                   Search &amp; filter plans
                 </h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {hasActiveFilters && (
                     <button
                       type="button"
@@ -350,7 +350,7 @@ const InstallmentsList = () => {
                   <button
                     type="button"
                     onClick={() => setShowFilters((v) => !v)}
-                    className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                    className="text-xs font-medium text-red-600 hover:text-red-800"
                   >
                     {showFilters ? 'Hide filters' : 'Show filters'}
                   </button>
@@ -364,11 +364,11 @@ const InstallmentsList = () => {
                   placeholder="Search by product name, ID, company, creator, city..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="input-brand pl-12"
                 />
               </div>
 
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="chip-scroll mb-4">
                 {[
                   { value: 'All', label: 'All', count: installments.length },
                   { value: 'in_stock', label: 'In Stock', count: statusCounts.in_stock },
@@ -381,10 +381,10 @@ const InstallmentsList = () => {
                     key={chip.value}
                     type="button"
                     onClick={() => setFilterStatus(chip.value)}
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all shrink-0 ${
                       filterStatus === chip.value
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300 hover:text-blue-700'
+                        ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-red-300 hover:text-red-700'
                     }`}
                   >
                     <span>{chip.label}</span>
@@ -406,7 +406,7 @@ const InstallmentsList = () => {
                     <select
                       value={filterCategory}
                       onChange={(e) => setFilterCategory(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="select-brand"
                     >
                       <option value="All">All categories</option>
                       {filterOptions.categories.map((cat) => (
@@ -422,7 +422,7 @@ const InstallmentsList = () => {
                     <select
                       value={filterCity}
                       onChange={(e) => setFilterCity(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="select-brand"
                     >
                       <option value="All">All Cities</option>
                       {cities.map((city) => (
@@ -438,7 +438,7 @@ const InstallmentsList = () => {
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="select-brand"
                     >
                       {LIST_STATUS_FILTER_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -453,7 +453,7 @@ const InstallmentsList = () => {
                     <select
                       value={filterListingType}
                       onChange={(e) => setFilterListingType(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="select-brand"
                     >
                       <option value="All">All listings</option>
                       <option value="owner">Your listings</option>
@@ -466,7 +466,7 @@ const InstallmentsList = () => {
                     <select
                       value={filterCreator}
                       onChange={(e) => setFilterCreator(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="select-brand"
                     >
                       <option value="All">All partners</option>
                       {filterOptions.creators.map((name) => (
@@ -482,7 +482,7 @@ const InstallmentsList = () => {
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="select-brand"
                     >
                       <option value="newest">Newest first</option>
                       <option value="oldest">Oldest first</option>
@@ -496,66 +496,66 @@ const InstallmentsList = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
-              <div className="glass-red rounded-xl p-6 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Matching plans</p>
-                    <p className="text-3xl font-bold text-gray-800">{filteredInstallments.length}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 mb-4">
+              <div className="glass-red rounded-xl p-4 sm:p-6 shadow-lg border border-red-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm text-gray-600 mb-1">Matching plans</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">{filteredInstallments.length}</p>
                   </div>
-                  <div className="p-3 bg-blue-100 rounded-lg">
-                    <FileText className="w-6 h-6 text-blue-600" />
+                  <div className="p-2.5 sm:p-3 bg-red-100 rounded-lg shrink-0">
+                    <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="glass-red rounded-xl p-6 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Your listings</p>
-                    <p className="text-3xl font-bold text-gray-800">
+              <div className="glass-red rounded-xl p-4 sm:p-6 shadow-lg border border-red-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm text-gray-600 mb-1">Your listings</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">
                       {filteredInstallments.filter(isOwnerListing).length}
                     </p>
                   </div>
-                  <div className="p-3 bg-green-100 rounded-lg">
-                    <TrendingUp className="w-6 h-6 text-green-600" />
+                  <div className="p-2.5 sm:p-3 bg-red-100 rounded-lg shrink-0">
+                    <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
                   </div>
                 </div>
               </div>
 
-              <div className="glass-red rounded-xl p-6 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Filtered value</p>
-                    <p className="text-3xl font-bold text-gray-800">
+              <div className="glass-red rounded-xl p-4 sm:p-6 shadow-lg border border-red-100 sm:col-span-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm text-gray-600 mb-1">Filtered value</p>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
                       ₨ {filteredInstallments.reduce((sum, i) => sum + (Number(i.price) || 0), 0).toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-3 bg-purple-100 rounded-lg">
-                    <DollarSign className="w-6 h-6 text-purple-600" />
+                  <div className="p-2.5 sm:p-3 bg-red-100 rounded-lg shrink-0">
+                    <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-6 sm:mb-8">
               {[
-                { key: 'in_stock', label: 'In Stock', count: statusCounts.in_stock, className: 'from-sky-50 to-white border-sky-100 text-sky-700' },
-                { key: 'out_of_stock', label: 'Out of Stock', count: statusCounts.out_of_stock, className: 'from-rose-50 to-white border-rose-100 text-rose-700' },
-                { key: 'approved', label: 'Approved', count: statusCounts.approved, className: 'from-emerald-50 to-white border-emerald-100 text-emerald-700' },
-                { key: 'pending', label: 'Pending', count: statusCounts.pending, className: 'from-amber-50 to-white border-amber-100 text-amber-700' },
-                { key: 'drafted', label: 'Drafted', count: statusCounts.drafted, className: 'from-slate-50 to-white border-slate-200 text-slate-700' },
+                { key: 'in_stock', label: 'In Stock', count: statusCounts.in_stock },
+                { key: 'out_of_stock', label: 'Out of Stock', count: statusCounts.out_of_stock },
+                { key: 'approved', label: 'Approved', count: statusCounts.approved },
+                { key: 'pending', label: 'Pending', count: statusCounts.pending },
+                { key: 'drafted', label: 'Drafted', count: statusCounts.drafted },
               ].map((item) => (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => setFilterStatus(item.key)}
-                  className={`rounded-xl border bg-gradient-to-br p-4 text-left transition-all hover:shadow-md ${
-                    item.className
-                  } ${filterStatus === item.key ? 'ring-2 ring-blue-500 shadow-md' : ''}`}
+                  className={`rounded-xl border bg-gradient-to-br from-red-50 to-white border-red-100 text-red-800 p-3 sm:p-4 text-left transition-all hover:shadow-md ${
+                    filterStatus === item.key ? 'ring-2 ring-red-600 shadow-md bg-red-50' : ''
+                  }`}
                 >
-                  <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{item.label}</p>
-                  <p className="text-2xl font-bold mt-1">{item.count}</p>
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide opacity-80 leading-tight">{item.label}</p>
+                  <p className="text-xl sm:text-2xl font-bold mt-1">{item.count}</p>
                 </button>
               ))}
             </div>
@@ -568,13 +568,13 @@ const InstallmentsList = () => {
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+                  className="btn-brand"
                 >
                   Clear all filters
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                 {filteredInstallments.map((installment) => {
                   const isOwner = isOwnerListing(installment);
                   const myCount = installment.myPlanCount ?? 0;
@@ -587,7 +587,7 @@ const InstallmentsList = () => {
                   return (
                     <div
                       key={listId}
-                      className="glass-red rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all transform hover:-translate-y-1"
+                      className="glass-red rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all border border-red-100"
                     >
                       {mainImage && (
                         <div className="relative h-48 bg-gray-100 overflow-hidden">
@@ -600,7 +600,7 @@ const InstallmentsList = () => {
                             <InstallmentStatusBadges item={installment} size="sm" />
                             <span
                               className={`px-2 py-1 text-[10px] font-semibold rounded-full whitespace-nowrap backdrop-blur-sm ${
-                                isOwner ? 'bg-green-500/90 text-white' : 'bg-amber-500/90 text-white'
+                                isOwner ? 'bg-red-600/90 text-white' : 'bg-white/90 text-red-700 border border-red-200'
                               }`}
                             >
                               {isOwner ? 'Your listing' : 'Shared'}
@@ -614,7 +614,7 @@ const InstallmentsList = () => {
                           <InstallmentStatusBadges item={installment} size="sm" />
                           <span
                             className={`px-2 py-1 text-[10px] font-semibold rounded-full whitespace-nowrap ${
-                              isOwner ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'
+                              isOwner ? 'bg-red-100 text-red-700' : 'bg-white text-red-600 border border-red-200'
                             }`}
                           >
                             {isOwner ? 'Your listing' : 'Shared'}
@@ -622,22 +622,22 @@ const InstallmentsList = () => {
                         </div>
                       )}
 
-                      <div className="p-6">
-                        <div className="flex items-start justify-between mb-3">
+                      <div className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-bold text-gray-800 line-clamp-2 mb-1">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900 line-clamp-2 mb-1">
                               {installment.productName || 'Installment Plan'}
                             </h3>
                             {categoryLabel && (
-                              <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded">
+                              <span className="inline-block px-2 py-1 bg-red-50 text-red-700 border border-red-100 text-xs font-medium rounded">
                                 {categoryLabel}
                               </span>
                             )}
                           </div>
-                          <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
+                          <div className="shrink-0">
                             <span
-                              className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
-                                isOwner ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'
+                              className={`inline-block px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
+                                isOwner ? 'bg-red-100 text-red-700' : 'bg-white text-red-600 border border-red-200'
                               }`}
                             >
                               {isOwner ? 'Your listing' : 'Shared · your plans'}
@@ -671,7 +671,7 @@ const InstallmentsList = () => {
                           <div className="flex items-center gap-2 text-sm">
                             <FileText className="w-4 h-4 text-gray-400" />
                             <span className="text-gray-600">Your plans:</span>
-                            <span className="font-semibold text-blue-700">{myCount}</span>
+                            <span className="font-semibold text-red-700">{myCount}</span>
                           </div>
 
                           {preview?.monthlyInstallment > 0 && (
@@ -702,7 +702,7 @@ const InstallmentsList = () => {
 
                           {myCount > 1 && (
                             <div className="pt-2">
-                              <span className="text-xs text-blue-600 font-medium">
+                              <span className="text-xs text-red-600 font-medium">
                                 +{myCount - 1} more of your plan{myCount > 2 ? 's' : ''}
                               </span>
                             </div>
@@ -721,7 +721,7 @@ const InstallmentsList = () => {
                           <button
                             type="button"
                             onClick={() => navigate(`/installments/view/${encodeURIComponent(listId)}`)}
-                            className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                            className="flex items-center justify-center gap-1 px-2 sm:px-3 py-2 bg-white text-red-600 border border-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-colors text-sm font-medium"
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
@@ -730,7 +730,7 @@ const InstallmentsList = () => {
                           <button
                             type="button"
                             onClick={() => navigate(`/installments/edit/${encodeURIComponent(listId)}`)}
-                            className="flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                            className="flex items-center justify-center gap-1 px-2 sm:px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
                             title={isOwner ? 'Edit listing' : 'Manage your plans'}
                           >
                             <Edit className="w-4 h-4" />

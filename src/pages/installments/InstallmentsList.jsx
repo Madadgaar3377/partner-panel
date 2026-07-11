@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus,
   FileText,
@@ -14,19 +14,24 @@ import {
   X,
   MapPin,
   User,
+  ChevronLeft,
+  ChevronRight,
+  Database,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import { PageLoader } from '../../components/Loader';
 import baseApi from '../../constants/apiUrl';
-import cities, { installmentMatchesCityFilter, formatInstallmentCityDisplay } from '../../constants/cites';
+import cities, { formatInstallmentCityDisplay } from '../../constants/cites';
 import { PRODUCT_CATEGORIES } from '../../constants/productCategories';
 import InstallmentStatusBadges from '../../components/installment/InstallmentStatusBadges';
 import {
   LIST_STATUS_FILTER_OPTIONS,
-  countByStatusFilter,
-  matchesInstallmentStatusFilter,
 } from '../../utils/installmentStatus';
+import BulkDataModal from '../../components/mada-data/BulkDataModal';
+import ExportRecordsModal from '../../components/mada-data/ExportRecordsModal';
+
+const PAGE_SIZE = 50;
 
 const CATEGORY_LABELS = Object.fromEntries(
   PRODUCT_CATEGORIES.map((c) => [c.value, c.label])
@@ -52,41 +57,26 @@ const getCreatorLabel = (item) => {
   }
   return (
     item.ownerCompanyName ||
-    item.companyName ||
     item.createdBy?.[0]?.name ||
-    'Unknown'
+    item.companyName ||
+    item.companyNameOther ||
+    item.postedBy ||
+    'Unknown partner'
   );
-};
-
-const getSearchBlob = (item) => {
-  const parts = [
-    item.productName,
-    item.installmentPlanId,
-    item._id,
-    item.category,
-    item.customCategory,
-    item.city,
-    ...(Array.isArray(item.cities) ? item.cities : []),
-    item.companyName,
-    item.companyNameOther,
-    item.ownerCompanyName,
-    item.description,
-    item.postedBy,
-    item.createdBy?.[0]?.name,
-    item.createdBy?.[0]?.userId,
-    item.createdBy?.[0]?.email,
-  ];
-  return parts.filter(Boolean).join(' ').toLowerCase();
 };
 
 const InstallmentsList = () => {
   const navigate = useNavigate();
   const [installments, setInstallments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
   const [error, setError] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(null);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterCity, setFilterCity] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
@@ -94,39 +84,100 @@ const InstallmentsList = () => {
   const [filterCreator, setFilterCreator] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 });
+  const [filterOptions, setFilterOptions] = useState({ categories: [], creators: [] });
+  const [totalCatalog, setTotalCatalog] = useState(0);
+  const [stats, setStats] = useState({
+    counts: { total: 0, in_stock: 0, out_of_stock: 0, approved: 0, pending: 0, drafted: 0, owner: 0, shared: 0 },
+    totalValue: 0,
+    matching: 0,
+    totalCatalog: 0,
+  });
 
-  const fetchInstallments = useCallback(async () => {
+  const isFirstLoad = useRef(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, filterCategory, filterCity, filterStatus, filterListingType, filterCreator, sortBy]);
+
+  const buildStatsQueryString = useCallback(() => {
+    const params = new URLSearchParams({ sortBy });
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (filterCategory !== 'All') params.set('category', filterCategory);
+    if (filterCity !== 'All') params.set('city', filterCity);
+    if (filterListingType !== 'All') params.set('listingType', filterListingType);
+    if (filterCreator !== 'All') params.set('creator', filterCreator);
+    return params.toString();
+  }, [debouncedSearch, filterCategory, filterCity, filterListingType, filterCreator, sortBy]);
+
+  const buildQueryString = useCallback(
+    (pageNum) => {
+      const params = new URLSearchParams({
+        paginated: 'true',
+        page: String(pageNum),
+        limit: String(PAGE_SIZE),
+        sortBy,
+      });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (filterCategory !== 'All') params.set('category', filterCategory);
+      if (filterCity !== 'All') params.set('city', filterCity);
+      if (filterStatus !== 'All') params.set('status', filterStatus);
+      if (filterListingType !== 'All') params.set('listingType', filterListingType);
+      if (filterCreator !== 'All') params.set('creator', filterCreator);
+      return params.toString();
+    },
+    [debouncedSearch, filterCategory, filterCity, filterStatus, filterListingType, filterCreator, sortBy]
+  );
+
+  const fetchInstallments = useCallback(async (pageNum = 1, initial = false) => {
     try {
       const token = localStorage.getItem('userToken');
-
       if (!token) {
         navigate('/');
         return;
       }
 
-      const response = await fetch(`${baseApi}/getAllCreateInstallnment`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      if (!initial) setListLoading(true);
 
-      const data = await response.json();
+      const qs = buildQueryString(pageNum);
+      const listRes = await fetch(`${baseApi}/getAllCreateInstallnment?${qs}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await listRes.json();
 
       if (data.success) {
-        const rows = (data.data || []).filter((item) => item.status !== 'deleted');
-        setInstallments(rows);
+        setInstallments((data.data || []).filter((item) => item.status !== 'deleted'));
+        setPagination(data.pagination || { page: pageNum, limit: PAGE_SIZE, total: 0, totalPages: 1 });
+        if (data.filterOptions) setFilterOptions(data.filterOptions);
+        if (typeof data.totalCatalog === 'number') setTotalCatalog(data.totalCatalog);
+        setError('');
       } else {
         setError(data.message || 'Failed to fetch installments');
       }
+
+      fetch(`${baseApi}/partner/installments/stats?${buildStatsQueryString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json())
+        .then((statsData) => {
+          if (statsData.success) setStats(statsData.data);
+        })
+        .catch(() => {});
     } catch (err) {
       console.error('Fetch installments error:', err);
       setError('Network error. Please check your connection.');
     } finally {
       setLoading(false);
+      setListLoading(false);
+      isFirstLoad.current = false;
     }
-  }, [navigate]);
+  }, [navigate, buildQueryString, buildStatsQueryString]);
 
   useEffect(() => {
     const isAuth = localStorage.getItem('isAuthenticated');
@@ -134,36 +185,24 @@ const InstallmentsList = () => {
       navigate('/');
       return;
     }
+    fetchInstallments(page, isFirstLoad.current);
+  }, [
+    navigate,
+    page,
+    debouncedSearch,
+    filterCategory,
+    filterCity,
+    filterStatus,
+    filterListingType,
+    filterCreator,
+    sortBy,
+    fetchInstallments,
+  ]);
 
-    fetchInstallments();
-  }, [navigate, fetchInstallments]);
+  const catalogTotal = totalCatalog || stats.totalCatalog || pagination.total || 0;
+  const hasPlansInCatalog = catalogTotal > 0 || installments.length > 0;
 
-  const filterOptions = useMemo(() => {
-    const categories = new Set();
-    const creators = new Set();
-
-    installments.forEach((item) => {
-      const cat = item.category || item.customCategory;
-      if (cat) categories.add(cat);
-      creators.add(getCreatorLabel(item));
-    });
-
-    return {
-      categories: Array.from(categories).sort(),
-      creators: Array.from(creators).sort(),
-    };
-  }, [installments]);
-
-  const statusCounts = useMemo(
-    () => ({
-      in_stock: countByStatusFilter(installments, 'in_stock'),
-      out_of_stock: countByStatusFilter(installments, 'out_of_stock'),
-      approved: countByStatusFilter(installments, 'approved'),
-      pending: countByStatusFilter(installments, 'pending'),
-      drafted: countByStatusFilter(installments, 'drafted'),
-    }),
-    [installments]
-  );
+  const statusCounts = stats.counts || {};
 
   const hasActiveFilters =
     searchTerm.trim() !== '' ||
@@ -182,56 +221,18 @@ const InstallmentsList = () => {
     setFilterListingType('All');
     setFilterCreator('All');
     setSortBy('newest');
+    setPage(1);
   };
 
-  const filteredInstallments = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
+  const handleFilterChange = (setter) => (e) => {
+    setter(e.target.value);
+    setPage(1);
+  };
 
-    let rows = installments.filter((item) => {
-      if (q && !getSearchBlob(item).includes(q)) return false;
-
-      const cat = item.category || item.customCategory || '';
-      if (filterCategory !== 'All' && cat !== filterCategory) return false;
-
-      if (!installmentMatchesCityFilter(item, filterCity)) return false;
-
-      if (!matchesInstallmentStatusFilter(item, filterStatus)) return false;
-
-      if (filterListingType === 'owner' && !isOwnerListing(item)) return false;
-      if (filterListingType === 'shared' && isOwnerListing(item)) return false;
-
-      if (filterCreator !== 'All' && getCreatorLabel(item) !== filterCreator) return false;
-
-      return true;
-    });
-
-    rows = [...rows].sort((a, b) => {
-      if (sortBy === 'oldest') {
-        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
-      }
-      if (sortBy === 'name') {
-        return (a.productName || '').localeCompare(b.productName || '');
-      }
-      if (sortBy === 'price_high') {
-        return Number(b.price || 0) - Number(a.price || 0);
-      }
-      if (sortBy === 'price_low') {
-        return Number(a.price || 0) - Number(b.price || 0);
-      }
-      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-    });
-
-    return rows;
-  }, [
-    installments,
-    searchTerm,
-    filterCategory,
-    filterCity,
-    filterStatus,
-    filterListingType,
-    filterCreator,
-    sortBy,
-  ]);
+  const handleStatusChip = (value) => {
+    setFilterStatus(value);
+    setPage(1);
+  };
 
   const handleDelete = async (installment) => {
     if (!isOwnerListing(installment)) {
@@ -261,12 +262,7 @@ const InstallmentsList = () => {
       const data = await response.json();
 
       if (data.success) {
-        setInstallments((prev) =>
-          prev.filter((item) => {
-            const itemId = item.installmentPlanId || item._id;
-            return itemId !== id && item._id !== id && item.status !== 'deleted';
-          })
-        );
+        fetchInstallments(page);
         setError('');
       } else {
         setError(data.message || 'Failed to delete installment plan');
@@ -292,19 +288,39 @@ const InstallmentsList = () => {
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Installment Plans</h1>
             <p className="text-sm sm:text-base text-gray-600 mt-1">
-              {installments.length > 0
-                ? `Showing ${filteredInstallments.length} of ${installments.length} plan${installments.length !== 1 ? 's' : ''}`
-                : 'Manage all your installment plans'}
+              {catalogTotal > 0
+                ? `Showing ${installments.length} of ${pagination.total || catalogTotal} plan${(pagination.total || catalogTotal) !== 1 ? 's' : ''}${pagination.totalPages > 1 ? ` (page ${pagination.page} of ${pagination.totalPages})` : ''} · ${catalogTotal} total in your catalog`
+                : hasActiveFilters
+                  ? 'No plans match your filters'
+                  : 'Manage all your installment plans'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/installments/create')}
-            className="btn-brand w-full sm:w-auto shrink-0"
-          >
-            <Plus className="w-5 h-5" />
-            Create Plan
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowExportModal(true)}
+              className="btn-brand-outline w-full sm:w-auto"
+            >
+              <FileText className="w-5 h-5" />
+              Download records
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBulkModal(true)}
+              className="btn-brand-outline w-full sm:w-auto"
+            >
+              <Database className="w-5 h-5" />
+              Bulk Data
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/installments/create')}
+              className="btn-brand w-full sm:w-auto"
+            >
+              <Plus className="w-5 h-5" />
+              Create Plan
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -314,7 +330,7 @@ const InstallmentsList = () => {
           </div>
         )}
 
-        {installments.length === 0 ? (
+        {!hasPlansInCatalog && !hasActiveFilters && !listLoading ? (
           <div className="glass-red rounded-xl shadow-lg p-8 text-center">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-800 mb-2">No Installment Plans Yet</h3>
@@ -370,17 +386,17 @@ const InstallmentsList = () => {
 
               <div className="chip-scroll mb-4">
                 {[
-                  { value: 'All', label: 'All', count: installments.length },
-                  { value: 'in_stock', label: 'In Stock', count: statusCounts.in_stock },
-                  { value: 'out_of_stock', label: 'Out of Stock', count: statusCounts.out_of_stock },
-                  { value: 'approved', label: 'Approved', count: statusCounts.approved },
-                  { value: 'pending', label: 'Pending', count: statusCounts.pending },
-                  { value: 'drafted', label: 'Drafted', count: statusCounts.drafted },
+                  { value: 'All', label: 'All', count: stats.matching || pagination.total },
+                  { value: 'in_stock', label: 'In Stock', count: statusCounts.in_stock || 0 },
+                  { value: 'out_of_stock', label: 'Out of Stock', count: statusCounts.out_of_stock || 0 },
+                  { value: 'approved', label: 'Approved', count: statusCounts.approved || 0 },
+                  { value: 'pending', label: 'Pending', count: statusCounts.pending || 0 },
+                  { value: 'drafted', label: 'Drafted', count: statusCounts.drafted || 0 },
                 ].map((chip) => (
                   <button
                     key={chip.value}
                     type="button"
-                    onClick={() => setFilterStatus(chip.value)}
+                    onClick={() => handleStatusChip(chip.value)}
                     className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all shrink-0 ${
                       filterStatus === chip.value
                         ? 'bg-red-600 text-white border-red-600 shadow-sm'
@@ -405,7 +421,7 @@ const InstallmentsList = () => {
                     <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
                     <select
                       value={filterCategory}
-                      onChange={(e) => setFilterCategory(e.target.value)}
+                      onChange={handleFilterChange(setFilterCategory)}
                       className="select-brand"
                     >
                       <option value="All">All categories</option>
@@ -421,7 +437,7 @@ const InstallmentsList = () => {
                     <label className="block text-xs font-medium text-gray-500 mb-1">City</label>
                     <select
                       value={filterCity}
-                      onChange={(e) => setFilterCity(e.target.value)}
+                      onChange={handleFilterChange(setFilterCity)}
                       className="select-brand"
                     >
                       <option value="All">All Cities</option>
@@ -437,7 +453,7 @@ const InstallmentsList = () => {
                     <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
                     <select
                       value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
+                      onChange={handleFilterChange(setFilterStatus)}
                       className="select-brand"
                     >
                       {LIST_STATUS_FILTER_OPTIONS.map((option) => (
@@ -452,7 +468,7 @@ const InstallmentsList = () => {
                     <label className="block text-xs font-medium text-gray-500 mb-1">Listing type</label>
                     <select
                       value={filterListingType}
-                      onChange={(e) => setFilterListingType(e.target.value)}
+                      onChange={handleFilterChange(setFilterListingType)}
                       className="select-brand"
                     >
                       <option value="All">All listings</option>
@@ -465,7 +481,7 @@ const InstallmentsList = () => {
                     <label className="block text-xs font-medium text-gray-500 mb-1">Created by</label>
                     <select
                       value={filterCreator}
-                      onChange={(e) => setFilterCreator(e.target.value)}
+                      onChange={handleFilterChange(setFilterCreator)}
                       className="select-brand"
                     >
                       <option value="All">All partners</option>
@@ -481,7 +497,10 @@ const InstallmentsList = () => {
                     <label className="block text-xs font-medium text-gray-500 mb-1">Sort by</label>
                     <select
                       value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
+                      onChange={(e) => {
+                        setSortBy(e.target.value);
+                        setPage(1);
+                      }}
                       className="select-brand"
                     >
                       <option value="newest">Newest first</option>
@@ -501,7 +520,7 @@ const InstallmentsList = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs sm:text-sm text-gray-600 mb-1">Matching plans</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">{filteredInstallments.length}</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.matching ?? pagination.total}</p>
                   </div>
                   <div className="p-2.5 sm:p-3 bg-red-100 rounded-lg shrink-0">
                     <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
@@ -513,9 +532,7 @@ const InstallmentsList = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs sm:text-sm text-gray-600 mb-1">Your listings</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                      {filteredInstallments.filter(isOwnerListing).length}
-                    </p>
+                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">{statusCounts.owner || 0}</p>
                   </div>
                   <div className="p-2.5 sm:p-3 bg-red-100 rounded-lg shrink-0">
                     <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
@@ -528,7 +545,7 @@ const InstallmentsList = () => {
                   <div className="min-w-0">
                     <p className="text-xs sm:text-sm text-gray-600 mb-1">Filtered value</p>
                     <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
-                      ₨ {filteredInstallments.reduce((sum, i) => sum + (Number(i.price) || 0), 0).toLocaleString()}
+                      ₨ {(stats.totalValue || 0).toLocaleString()}
                     </p>
                   </div>
                   <div className="p-2.5 sm:p-3 bg-red-100 rounded-lg shrink-0">
@@ -549,7 +566,7 @@ const InstallmentsList = () => {
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => setFilterStatus(item.key)}
+                  onClick={() => handleStatusChip(item.key)}
                   className={`rounded-xl border bg-gradient-to-br from-red-50 to-white border-red-100 text-red-800 p-3 sm:p-4 text-left transition-all hover:shadow-md ${
                     filterStatus === item.key ? 'ring-2 ring-red-600 shadow-md bg-red-50' : ''
                   }`}
@@ -560,7 +577,11 @@ const InstallmentsList = () => {
               ))}
             </div>
 
-            {filteredInstallments.length === 0 ? (
+            {listLoading && (
+              <div className="text-center py-4 text-sm text-red-600 font-medium">Updating list…</div>
+            )}
+
+            {installments.length === 0 ? (
               <div className="glass-red rounded-xl shadow-lg p-8 text-center">
                 <Search className="w-14 h-14 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-800 mb-2">No plans match your filters</h3>
@@ -575,7 +596,7 @@ const InstallmentsList = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-                {filteredInstallments.map((installment) => {
+                {installments.map((installment) => {
                   const isOwner = isOwnerListing(installment);
                   const myCount = installment.myPlanCount ?? 0;
                   const preview = installment.myPlansPreview?.[0];
@@ -647,9 +668,18 @@ const InstallmentsList = () => {
 
                         <p className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded px-2 py-1.5 mb-3 flex items-center gap-1.5">
                           <User className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <span>
-                            {isOwner ? 'Created by you' : 'Listed by'}:{' '}
-                            <strong className="text-gray-800">{creatorLabel}</strong>
+                          <span className="min-w-0">
+                            {isOwner ? (
+                              <>
+                                Created by: <strong className="text-gray-800">{creatorLabel}</strong>
+                                <span className="text-gray-500"> (you)</span>
+                              </>
+                            ) : (
+                              <>
+                                Product owner: <strong className="text-gray-800">{creatorLabel}</strong>
+                                <span className="text-gray-500"> · your payment plans attached</span>
+                              </>
+                            )}
                           </span>
                         </p>
 
@@ -758,9 +788,52 @@ const InstallmentsList = () => {
                 })}
               </div>
             )}
+
+            {pagination.totalPages > 1 && installments.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-red-100">
+                <p className="text-sm text-gray-600">
+                  Page {pagination.page} of {pagination.totalPages} · {pagination.total} total
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={pagination.page <= 1 || listLoading}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium border border-red-200 rounded-lg text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pagination.page >= pagination.totalPages || listLoading}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium border border-red-200 rounded-lg text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
+
+      {showBulkModal && (
+        <BulkDataModal
+          onClose={() => setShowBulkModal(false)}
+          onImportComplete={() => {
+            setShowBulkModal(false);
+            setPage(1);
+            fetchInstallments(1);
+          }}
+        />
+      )}
+
+      {showExportModal && (
+        <ExportRecordsModal onClose={() => setShowExportModal(false)} />
+      )}
     </div>
   );
 };

@@ -52,6 +52,23 @@ export const getBulkJobStatus = async (token, jobId) => {
   return data.data;
 };
 
+export const downloadJobFile = async (token, jobId, filename) => {
+  const res = await fetch(`${baseApi}/mada-data/jobs/${jobId}/download`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Download failed');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || `madadgaar-${jobId}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 export const listBulkJobs = async (token, { partnerId, jobType } = {}) => {
   const params = new URLSearchParams();
   if (partnerId) params.set('partnerId', partnerId);

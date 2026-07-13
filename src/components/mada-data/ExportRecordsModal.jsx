@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Download, Loader2 } from 'lucide-react';
-import { startExport, getBulkJobStatus } from '../../services/madaDataApi';
+import { startExport, getBulkJobStatus, downloadJobFile } from '../../services/madaDataApi';
 
 const EXPORT_TYPES = [
   { value: 'installments', label: 'Installment listings', hasCategory: true, categoryType: 'product' },
@@ -56,8 +56,11 @@ const ExportRecordsModal = ({ onClose, token: tokenProp, defaultExportType = 'in
         if (job.status === 'completed') {
           clearInterval(interval);
           setLoading(false);
-          setStatus('Export ready');
-          if (job.resultFileUrl) window.open(job.resultFileUrl, '_blank');
+          setStatus('Export ready — downloading…');
+          if (job.hasDownload) {
+            await downloadJobFile(token, jobId, `madadgaar-${exportType}-export.xlsx`);
+            setStatus('Download complete (file removed from server storage)');
+          }
         } else if (job.status === 'failed') {
           clearInterval(interval);
           setLoading(false);

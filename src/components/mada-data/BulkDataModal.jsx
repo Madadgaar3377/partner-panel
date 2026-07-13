@@ -6,6 +6,7 @@ import {
   uploadInstallmentBulk,
   getBulkJobStatus,
   listBulkJobs,
+  downloadJobFile,
   UPLOAD_MODES,
 } from '../../services/madaDataApi';
 
@@ -263,15 +264,14 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
                             {item.successCount ?? 0} ok · {item.failCount ?? 0} failed
                           </p>
                         </div>
-                        {item.resultFileUrl && (
-                          <a
-                            href={item.resultFileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-red-600 font-medium shrink-0"
+                        {item.hasDownload !== false && (item.resultFileUrl || item.resultFileKey) && !item.resultFileDeleted && (
+                          <button
+                            type="button"
+                            onClick={() => downloadJobFile(token, item.jobId || item._id, `madadgaar-import-${item.jobId || item._id}.xlsx`).catch((e) => setError(e.message))}
+                            className="text-xs text-red-600 font-medium shrink-0 hover:underline"
                           >
                             Report
-                          </a>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -315,16 +315,15 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
                 <p className="text-sm text-red-600">{job.errorMessage}</p>
               )}
 
-              {job.resultFileUrl && (
-                <a
-                  href={job.resultFileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {job.hasDownload && (
+                <button
+                  type="button"
+                  onClick={() => downloadJobFile(token, job.jobId, `madadgaar-import-result.xlsx`).catch((e) => setError(e.message))}
                   className="inline-flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-800"
                 >
                   <Download className="w-4 h-4" />
                   Download result report
-                </a>
+                </button>
               )}
 
               {job.status === 'completed' && (

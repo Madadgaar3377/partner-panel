@@ -3,14 +3,31 @@ import { X, Download, Loader2 } from 'lucide-react';
 import { startExport, getBulkJobStatus } from '../../services/madaDataApi';
 
 const EXPORT_TYPES = [
-  { value: 'installments', label: 'Installment listings' },
-  { value: 'agents', label: 'Linked agents' },
-  { value: 'finance', label: 'Finance & commissions' },
-  { value: 'cases', label: 'Cases & track record' },
+  { value: 'installments', label: 'Installment listings', hasCategory: true, categoryType: 'product' },
+  { value: 'agents', label: 'Linked agents', hasCategory: false },
+  { value: 'finance', label: 'Finance & commissions', hasCategory: true, categoryType: 'case' },
+  { value: 'cases', label: 'Cases & track record', hasCategory: true, categoryType: 'case' },
 ];
 
-const ExportRecordsModal = ({ onClose, token: tokenProp }) => {
-  const [exportType, setExportType] = useState('installments');
+const CASE_CATEGORY_OPTIONS = [
+  { value: '', label: 'All categories' },
+  { value: 'Installment', label: 'Installment' },
+  { value: 'Property', label: 'Property' },
+  { value: 'Loan', label: 'Loan' },
+  { value: 'Insurance', label: 'Insurance' },
+];
+
+const PRODUCT_CATEGORY_OPTIONS = [
+  { value: '', label: 'All product categories' },
+  { value: 'laptops', label: 'Laptops' },
+  { value: 'smartphones', label: 'Smartphones' },
+  { value: 'air_conditioners', label: 'Air Conditioners' },
+  { value: 'cars', label: 'Cars' },
+];
+
+const ExportRecordsModal = ({ onClose, token: tokenProp, defaultExportType = 'installments' }) => {
+  const [exportType, setExportType] = useState(defaultExportType);
+  const [category, setCategory] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,6 +35,8 @@ const ExportRecordsModal = ({ onClose, token: tokenProp }) => {
   const [status, setStatus] = useState('');
 
   const token = tokenProp || localStorage.getItem('userToken');
+  const selected = EXPORT_TYPES.find((t) => t.value === exportType) || EXPORT_TYPES[0];
+  const categoryOptions = selected.categoryType === 'product' ? PRODUCT_CATEGORY_OPTIONS : CASE_CATEGORY_OPTIONS;
 
   const handleExport = async () => {
     if (!startDate || !endDate) {
@@ -28,7 +47,9 @@ const ExportRecordsModal = ({ onClose, token: tokenProp }) => {
     setError('');
     setStatus('Starting export…');
     try {
-      const { jobId } = await startExport(token, exportType, { startDate, endDate });
+      const filters = { startDate, endDate };
+      if (category) filters.category = category;
+      const { jobId } = await startExport(token, exportType, filters);
       setStatus('Generating file…');
       const interval = setInterval(async () => {
         const job = await getBulkJobStatus(token, jobId);
@@ -65,12 +86,28 @@ const ExportRecordsModal = ({ onClose, token: tokenProp }) => {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Record type</label>
-            <select value={exportType} onChange={(e) => setExportType(e.target.value)} className="select-brand w-full">
+            <select
+              value={exportType}
+              onChange={(e) => { setExportType(e.target.value); setCategory(''); }}
+              className="select-brand w-full"
+            >
               {EXPORT_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
           </div>
+
+          {selected.hasCategory && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Category (optional)</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="select-brand w-full">
+                {categoryOptions.map((c) => (
+                  <option key={c.value || 'all'} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Start date</label>

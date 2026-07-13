@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Download, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Download, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Loader2, History } from 'lucide-react';
 import { getGroupedCategories } from '../../constants/productCategories';
 import {
   downloadInstallmentTemplate,
   uploadInstallmentBulk,
   getBulkJobStatus,
+  listBulkJobs,
   UPLOAD_MODES,
 } from '../../services/madaDataApi';
 
@@ -18,6 +19,8 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
   const [error, setError] = useState('');
   const [job, setJob] = useState(null);
   const [polling, setPolling] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const token = tokenProp || localStorage.getItem('userToken');
   const grouped = getGroupedCategories();
@@ -43,6 +46,22 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
       setPolling(false);
     };
   }, [token]);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const jobs = await listBulkJobs(token, { jobType: 'import' });
+      setHistory(jobs || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (action === 'history') loadHistory();
+  }, [action, loadHistory]);
 
   useEffect(() => {
     if (!job?.jobId || polling) return undefined;
@@ -113,7 +132,7 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
           {step === 1 && (
             <>
               <p className="text-sm text-gray-600">Choose an action for installment listings.</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => { setAction('download'); setStep(2); }}
@@ -131,6 +150,15 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
                   <Upload className="w-6 h-6 text-red-600 mb-2" />
                   <p className="font-semibold text-gray-900">Upload file</p>
                   <p className="text-xs text-gray-500 mt-1">Import products as drafts</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAction('history'); setStep(4); }}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${action === 'history' ? 'border-red-600 bg-red-50' : 'border-gray-200 hover:border-red-300'}`}
+                >
+                  <History className="w-6 h-6 text-red-600 mb-2" />
+                  <p className="font-semibold text-gray-900">Import history</p>
+                  <p className="text-xs text-gray-500 mt-1">Past uploads & result reports</p>
                 </button>
               </div>
             </>
@@ -205,6 +233,55 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
                 </button>
               </div>
             </>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-900">Recent import jobs</p>
+                <button type="button" onClick={loadHistory} className="text-xs text-red-600 font-medium hover:underline">
+                  Refresh
+                </button>
+              </div>
+              {historyLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-red-600" />
+                </div>
+              ) : history.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-6">No import jobs yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {history.map((item) => (
+                    <div key={item.jobId} className="p-3 border border-gray-100 rounded-xl text-sm">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <p className="font-medium text-gray-900 capitalize">{item.status}</p>
+                          <p className="text-xs text-gray-500">
+                            {item.category || '—'} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {item.successCount ?? 0} ok · {item.failCount ?? 0} failed
+                          </p>
+                        </div>
+                        {item.resultFileUrl && (
+                          <a
+                            href={item.resultFileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-red-600 font-medium shrink-0"
+                          >
+                            Report
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button type="button" onClick={() => setStep(1)} className="btn-brand-outline w-full">
+                Back
+              </button>
+            </div>
           )}
 
           {step === 3 && job && (

@@ -52,9 +52,12 @@ export const getBulkJobStatus = async (token, jobId) => {
   return data.data;
 };
 
-export const listBulkJobs = async (token, { partnerId } = {}) => {
-  const params = partnerId ? `?partnerId=${encodeURIComponent(partnerId)}` : '';
-  const res = await fetch(`${baseApi}/mada-data/jobs${params}`, {
+export const listBulkJobs = async (token, { partnerId, jobType } = {}) => {
+  const params = new URLSearchParams();
+  if (partnerId) params.set('partnerId', partnerId);
+  if (jobType) params.set('jobType', jobType);
+  const qs = params.toString() ? `?${params}` : '';
+  const res = await fetch(`${baseApi}/mada-data/jobs${qs}`, {
     headers: authHeaders(token),
   });
   const data = await res.json();

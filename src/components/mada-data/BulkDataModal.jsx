@@ -141,7 +141,7 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
                 >
                   <Download className="w-6 h-6 text-red-600 mb-2" />
                   <p className="font-semibold text-gray-900">Download template</p>
-                  <p className="text-xs text-gray-500 mt-1">Category-specific xlsx with example row</p>
+                  <p className="text-xs text-gray-500 mt-1">Simple sheet with auto price & EMI calc</p>
                 </button>
                 <button
                   type="button"
@@ -208,7 +208,7 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
                     className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-red-50 file:text-red-700"
                   />
                   <p className="text-xs text-gray-500 mt-2">
-                    Max 5 MB · up to 2000 rows. Imports are saved as <strong>drafted</strong>. Add images in the panel, then set status to Approved to publish.
+                    Max 5 MB · up to 2000 rows. Enter <strong>Base Price + Discount %</strong> — discounted price auto-fills (same as create installment). Imports save as <strong>drafted</strong>.
                   </p>
                 </div>
               )}

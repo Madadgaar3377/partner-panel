@@ -178,8 +178,8 @@ export function recalculatePaymentPlan(plan, form) {
   ) {
     cashPrice = getVariantEffectivePrice(form.variants[p.variantIndex]);
   } else {
-    const explicit = roundPKR(form.price);
-    cashPrice = explicit > 0 ? explicit : getBaseEffectivePrice(form);
+    cashPrice = getBaseEffectivePrice(form);
+    if (cashPrice <= 0) cashPrice = roundPKR(form.price);
   }
 
   const downPayment = roundPKR(p.downPayment);

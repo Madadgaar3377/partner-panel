@@ -120,6 +120,7 @@ const ProfileView = () => {
         partnerName: userData.name || '',
         partnerType: userData.companyDetails?.PartnerType || '',
         profilePic: userData.profilePic || '',
+        userId: userData.userId || '',
         isVerified: Boolean(userData.isVerified),
       });
       setQrDataUrl(dataUrl);
@@ -255,19 +256,16 @@ const ProfileView = () => {
                 <div className="flex flex-col sm:flex-row items-start gap-5">
                   <div className="relative mx-auto sm:mx-0">
                     {qrDataUrl ? (
-                      <div className="relative group">
-                        <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-red-600/30 to-red-900/10 blur-sm" />
-                        <img
-                          src={qrDataUrl}
-                          alt="Partner profile QR card"
-                          className="relative w-44 sm:w-52 h-auto rounded-xl border border-red-100 shadow-lg bg-white"
-                        />
-                      </div>
+                      <img
+                        src={qrDataUrl}
+                        alt="Partner profile QR card"
+                        className="w-44 sm:w-52 h-auto rounded-xl border border-gray-200 shadow-sm bg-white"
+                      />
                     ) : (
-                      <div className="w-44 sm:w-52 aspect-[900/1180] rounded-xl border-2 border-dashed border-red-200 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-red-50 to-white px-3 text-center">
-                        <QrCode className="w-10 h-10 text-red-300" />
+                      <div className="w-44 sm:w-52 aspect-[900/1200] rounded-xl border border-gray-200 flex flex-col items-center justify-center gap-2 bg-white px-3 text-center">
+                        <QrCode className="w-10 h-10 text-red-600" />
                         <p className="text-[11px] text-gray-500 leading-snug">
-                          Generate a print-ready card with logo & partner branding
+                          Logo, bold name, and your public profile link
                         </p>
                       </div>
                     )}

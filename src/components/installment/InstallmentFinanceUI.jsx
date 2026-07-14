@@ -33,7 +33,7 @@ export const ProductFinancePanel = ({ finance, onUpdate, financeOnly = false }) 
     </h3>
     {financeOnly && (
       <p className="text-sm text-blue-800 mb-4">
-        Bank finance only — cash price and installment plans are not required.
+        Bank finance only  cash price and installment plans are not required.
       </p>
     )}
     <div className="space-y-4">

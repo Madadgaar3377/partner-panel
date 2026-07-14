@@ -16,17 +16,26 @@ import {
   FileText,
   Eye,
   Users,
-  Download
+  Download,
+  Link2,
+  QrCode,
+  Copy
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import baseApi from '../constants/apiUrl';
+import { createPartnerProfileQrCard } from '../utils/partnerProfileQr';
+
+const FRONTEND_ORIGIN = 'https://madadgaar.com.pk';
 
 const ProfileView = () => {
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [copyDone, setCopyDone] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [qrBusy, setQrBusy] = useState(false);
 
   const fetchUserData = useCallback(async () => {
     try {
@@ -72,6 +81,63 @@ const ProfileView = () => {
 
     fetchUserData();
   }, [navigate, fetchUserData]);
+
+  const publicProfileUrl = userData?.userId
+    ? `${FRONTEND_ORIGIN}/partner/${encodeURIComponent(userData.userId)}`
+    : '';
+
+  const copyPublicLink = async () => {
+    if (!publicProfileUrl) return;
+    try {
+      await navigator.clipboard.writeText(publicProfileUrl);
+      setCopyDone(true);
+      setTimeout(() => setCopyDone(false), 2000);
+    } catch {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = publicProfileUrl;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        setCopyDone(true);
+        setTimeout(() => setCopyDone(false), 2000);
+      } catch {
+        setError('Could not copy link');
+      }
+    }
+  };
+
+  const generateBrandedQr = async () => {
+    if (!publicProfileUrl || !userData?.isVerified) return;
+    setQrBusy(true);
+    setError('');
+    try {
+      const dataUrl = await createPartnerProfileQrCard({
+        publicUrl: publicProfileUrl,
+        companyName:
+          userData.companyDetails?.RegisteredCompanyName || userData.name || 'Partner',
+        partnerName: userData.name || '',
+        partnerType: userData.companyDetails?.PartnerType || '',
+        profilePic: userData.profilePic || '',
+        isVerified: Boolean(userData.isVerified),
+      });
+      setQrDataUrl(dataUrl);
+    } catch (err) {
+      console.error('QR generate failed', err);
+      setError('Failed to generate QR code');
+    } finally {
+      setQrBusy(false);
+    }
+  };
+
+  const downloadQr = () => {
+    if (!qrDataUrl) return;
+    const a = document.createElement('a');
+    a.href = qrDataUrl;
+    a.download = `madadgaar-partner-${userData?.userId || 'profile'}-qr.png`;
+    a.click();
+  };
 
   if (loading) {
     return (
@@ -134,6 +200,107 @@ const ProfileView = () => {
             <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
+
+        {/* Share public profile + QR */}
+        <div className="mb-6 glass-red rounded-xl shadow-lg p-6 sm:p-8 border border-red-100">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-red-100">
+              <Link2 className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">Share Public Profile</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Anyone can open your Madadgaar storefront via this link or QR  no login required.
+              </p>
+            </div>
+          </div>
+
+          {!userData.isVerified ? (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+              <Clock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-yellow-800">
+                Your public profile is available after admin verification. Once verified, you can copy the link and download a branded QR.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Public URL</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    readOnly
+                    value={publicProfileUrl}
+                    className="flex-1 px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-800 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={copyPublicLink}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition"
+                  >
+                    <Copy className="w-4 h-4" />
+                    {copyDone ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <a
+                  href={publicProfileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block mt-3 text-sm font-semibold text-red-600 hover:underline"
+                >
+                  Open public page →
+                </a>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Branded QR card</p>
+                <div className="flex flex-col sm:flex-row items-start gap-5">
+                  <div className="relative mx-auto sm:mx-0">
+                    {qrDataUrl ? (
+                      <div className="relative group">
+                        <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-red-600/30 to-red-900/10 blur-sm" />
+                        <img
+                          src={qrDataUrl}
+                          alt="Partner profile QR card"
+                          className="relative w-44 sm:w-52 h-auto rounded-xl border border-red-100 shadow-lg bg-white"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-44 sm:w-52 aspect-[900/1180] rounded-xl border-2 border-dashed border-red-200 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-red-50 to-white px-3 text-center">
+                        <QrCode className="w-10 h-10 text-red-300" />
+                        <p className="text-[11px] text-gray-500 leading-snug">
+                          Generate a print-ready card with logo & partner branding
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 w-full sm:w-auto">
+                    <p className="text-xs text-gray-500 mb-1 max-w-xs">
+                      
+                    </p>
+                    <button
+                      type="button"
+                      onClick={generateBrandedQr}
+                      disabled={qrBusy}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 border-red-600 text-red-600 font-semibold hover:bg-red-50 transition disabled:opacity-50"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      {qrBusy ? 'Designing card…' : qrDataUrl ? 'Regenerate card' : 'Generate QR card'}
+                    </button>
+                    {qrDataUrl && (
+                      <button
+                        type="button"
+                        onClick={downloadQr}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gray-900 text-white font-semibold hover:bg-black transition"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download PNG
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Profile Card */}

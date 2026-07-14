@@ -162,7 +162,7 @@ function PlanComposerForm({ plan, form, onUpdate, editingIndex }) {
         <div className="flex items-center gap-2 mb-2">
           <Calculator className="w-4 h-4 text-gray-500" />
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            {editingIndex !== null ? `Preview — plan #${editingIndex + 1}` : 'Calculation preview'}
+            {editingIndex !== null ? `Preview  plan #${editingIndex + 1}` : 'Calculation preview'}
           </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -213,7 +213,7 @@ function PlansTable({ plans, form, editingIndex, onEdit, onRemove }) {
             const variantName =
               plan.variantIndex != null && form.variants?.[plan.variantIndex]
                 ? form.variants[plan.variantIndex].variantName
-                : '—';
+                : '';
             const rateLabel =
               plan.interestType === 'Profit-Based (Islamic/Shariah)'
                 ? `${Number(plan.interestRatePercent || 0).toFixed(1)}%`
@@ -480,7 +480,7 @@ export function Step4PlansBuilder({
         </p>
       ) : null}
 
-      {/* Composer — clean panel, stays fixed while scrolling list */}
+      {/* Composer  clean panel, stays fixed while scrolling list */}
       <section
         ref={composerRef}
         className="sticky top-0 z-20 scroll-mt-4 rounded-xl border border-gray-200 bg-white shadow-sm"
@@ -491,7 +491,7 @@ export function Step4PlansBuilder({
               {editingIndex !== null ? `Edit plan #${editingIndex + 1}` : 'Add payment plan'}
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Enter details below, then click Add plan — the form stays here while your list grows.
+              Enter details below, then click Add plan  the form stays here while your list grows.
             </p>
           </div>
           {editingIndex !== null ? (

@@ -270,7 +270,7 @@ MADADGAAR_API_BASE=${INTEGRATION_BASE}`;
           <h2 className="text-lg font-bold text-gray-900 mb-4">3. Loans API</h2>
           <p className="text-sm text-gray-600 mb-4">
             Base: <code className="bg-gray-100 px-1 rounded">{INTEGRATION_BASE}/loans</code>
-            {' '}— full CRUD for loan plans you own. <code>createdBy</code> is auto-filled from your API key.
+            {' '} full CRUD for loan plans you own. <code>createdBy</code> is auto-filled from your API key.
           </p>
           <div className="overflow-x-auto mb-6">
             <table className="w-full text-sm">
@@ -314,7 +314,7 @@ MADADGAAR_API_BASE=${INTEGRATION_BASE}`;
           <h2 className="text-lg font-bold text-gray-900 mb-4">4. Loan applications API</h2>
           <p className="text-sm text-gray-600 mb-4">
             Base: <code className="bg-gray-100 px-1 rounded">{INTEGRATION_BASE}/loan-applications</code>
-            {' '}— manage customer applications on your loan plans (same leads as partner panel).
+            {' '} manage customer applications on your loan plans (same leads as partner panel).
           </p>
           <div className="overflow-x-auto mb-4">
             <table className="w-full text-sm">
@@ -346,7 +346,7 @@ MADADGAAR_API_BASE=${INTEGRATION_BASE}`;
           </div>
           <h3 className="font-semibold text-gray-900 text-sm mb-1">How customers apply</h3>
           <p className="text-xs text-gray-500 mb-2">
-            Customers use their Madadgaar account JWT on the public API — not your partner API key. After they apply, poll loan-applications.
+            Customers use their Madadgaar account JWT on the public API  not your partner API key. After they apply, poll loan-applications.
           </p>
           <CodeBlock text={applyLoanCustomerExample} id="apply-loan-customer" />
         </section>

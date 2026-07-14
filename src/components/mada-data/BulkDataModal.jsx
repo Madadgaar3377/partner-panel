@@ -208,7 +208,7 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
                     className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-red-50 file:text-red-700"
                   />
                   <p className="text-xs text-gray-500 mt-2">
-                    Max 5 MB · up to 2000 rows. Enter <strong>Base Price + Discount %</strong> — discounted price auto-fills (same as create installment). Imports save as <strong>drafted</strong>.
+                    Max 5 MB · up to 2000 rows. Enter <strong>Base Price + Discount %</strong>  discounted price auto-fills (same as create installment). Imports save as <strong>drafted</strong>.
                   </p>
                 </div>
               )}
@@ -258,7 +258,7 @@ const BulkDataModal = ({ onClose, onImportComplete, token: tokenProp, partnerId 
                         <div>
                           <p className="font-medium text-gray-900 capitalize">{item.status}</p>
                           <p className="text-xs text-gray-500">
-                            {item.category || '—'} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
+                            {item.category || ''} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
                           </p>
                           <p className="text-xs text-gray-500">
                             {item.successCount ?? 0} ok · {item.failCount ?? 0} failed

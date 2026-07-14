@@ -262,10 +262,10 @@ const ProfileView = () => {
                         className="w-44 sm:w-52 h-auto rounded-xl border border-gray-200 shadow-sm bg-white"
                       />
                     ) : (
-                      <div className="w-44 sm:w-52 aspect-[900/1200] rounded-xl border border-gray-200 flex flex-col items-center justify-center gap-2 bg-white px-3 text-center">
+                      <div className="w-44 sm:w-52 aspect-[900/1280] rounded-xl border border-gray-200 flex flex-col items-center justify-center gap-2 bg-white px-3 text-center">
                         <QrCode className="w-10 h-10 text-red-600" />
                         <p className="text-[11px] text-gray-500 leading-snug">
-                          Logo, bold name, and your public profile link
+                          Large QR with Madadgaar logo and verified partner name
                         </p>
                       </div>
                     )}

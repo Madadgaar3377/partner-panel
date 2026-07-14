@@ -1,13 +1,15 @@
 /**
  * Simple Madadgaar partner-profile QR card.
- * Partner logo + bold name + QR + public URL footer.
+ * Partner logo + bold name (verified tick) + large QR with Madadgaar logo.
  * Returns a PNG data URL for preview/download.
  */
 
 const RED = "#B7242A";
 const INK = "#161618";
 const MUTED = "#5C5C66";
+const GREEN = "#16A34A";
 const PAPER = "#FFFFFF";
+const MADADGAAR_LOGO = "/madadgaar-logo.jpg";
 
 function roundRect(ctx, x, y, w, h, r) {
   const radius = Math.min(r, w / 2, h / 2);
@@ -53,19 +55,9 @@ async function loadImageSafe(src) {
   }
 }
 
-function fitText(ctx, text, maxWidth, maxChars = 48) {
-  let t = String(text || "").trim();
-  if (!t) return "";
-  if (t.length > maxChars) t = `${t.slice(0, maxChars - 1)}…`;
-  while (t.length > 4 && ctx.measureText(t).width > maxWidth) {
-    t = `${t.slice(0, -2)}…`;
-  }
-  return t;
-}
-
-function drawWrappedBold(ctx, text, x, y, maxWidth, lineHeight, maxLines = 2) {
+function wrapLines(ctx, text, maxWidth, maxLines = 2) {
   const words = String(text || "").trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return y;
+  if (!words.length) return [];
   const lines = [];
   let line = "";
   for (const word of words) {
@@ -81,7 +73,8 @@ function drawWrappedBold(ctx, text, x, y, maxWidth, lineHeight, maxLines = 2) {
   if (line && lines.length < maxLines) lines.push(line);
   if (lines.length === maxLines) {
     const last = lines[maxLines - 1];
-    if (ctx.measureText(last).width > maxWidth || words.join(" ").length > last.length) {
+    const full = words.join(" ");
+    if (ctx.measureText(last).width > maxWidth || full.length > last.length) {
       let trimmed = last;
       while (trimmed.length > 3 && ctx.measureText(`${trimmed}…`).width > maxWidth) {
         trimmed = trimmed.slice(0, -1);
@@ -89,10 +82,66 @@ function drawWrappedBold(ctx, text, x, y, maxWidth, lineHeight, maxLines = 2) {
       lines[maxLines - 1] = `${trimmed}…`;
     }
   }
-  lines.forEach((ln, i) => {
-    ctx.fillText(ln, x, y + i * lineHeight);
-  });
-  return y + (lines.length - 1) * lineHeight;
+  return lines;
+}
+
+/** Green verified tick (circle + check) like Madadgaar frontend */
+function drawVerifiedTick(ctx, cx, cy, size = 36) {
+  const r = size / 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = GREEN;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = Math.max(3, size * 0.12);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const s = size;
+  ctx.moveTo(cx - s * 0.22, cy + s * 0.02);
+  ctx.lineTo(cx - s * 0.04, cy + s * 0.2);
+  ctx.lineTo(cx + s * 0.24, cy - s * 0.18);
+  ctx.stroke();
+}
+
+/** Diagonal “MADADGAAR” watermark across the card body */
+function drawCardWatermark(ctx, W, H, companyName = "") {
+  ctx.save();
+  ctx.globalAlpha = 0.055;
+  ctx.fillStyle = RED;
+  ctx.font = "800 42px system-ui, -apple-system, Segoe UI, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const stepX = 280;
+  const stepY = 160;
+  ctx.translate(W / 2, H / 2);
+  ctx.rotate((-28 * Math.PI) / 180);
+  ctx.translate(-W / 2, -H / 2);
+
+  for (let y = -H; y < H * 2; y += stepY) {
+    for (let x = -W; x < W * 2; x += stepX) {
+      const odd = Math.floor(y / stepY) % 2 !== 0;
+      ctx.fillText("MADADGAAR", x + (odd ? stepX / 2 : 0), y);
+    }
+  }
+  ctx.restore();
+
+  // Large faint company-name watermark behind content
+  const label = String(companyName || "").trim();
+  if (label) {
+    ctx.save();
+    ctx.globalAlpha = 0.04;
+    ctx.fillStyle = INK;
+    ctx.font = "900 120px system-ui, -apple-system, Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.translate(W / 2, H * 0.42);
+    ctx.rotate((-18 * Math.PI) / 180);
+    ctx.fillText(label.length > 18 ? `${label.slice(0, 17)}…` : label, 0, 0);
+    ctx.restore();
+  }
 }
 
 /**
@@ -113,14 +162,13 @@ export async function createPartnerProfileQrCard(opts) {
     partnerName = "",
     partnerType = "",
     profilePic = "",
-    userId = "",
     isVerified = true,
   } = opts;
 
   const QRCode = (await import("qrcode")).default;
 
   const W = 900;
-  const H = 1200;
+  const H = 1280;
   const canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -128,46 +176,42 @@ export async function createPartnerProfileQrCard(opts) {
 
   const displayName =
     String(companyName || partnerName || "Partner").trim() || "Partner";
-  const pathLabel = userId
-    ? `madadgaar.com.pk/partner/${userId}`
-    : String(publicUrl || "")
-        .replace(/^https?:\/\//i, "")
-        .replace(/\/$/, "");
 
-  // Flat white card background
+  // Flat white card background + watermark (under content, not over QR)
   ctx.fillStyle = PAPER;
   ctx.fillRect(0, 0, W, H);
+  drawCardWatermark(ctx, W, H, displayName);
 
-  // Flat solid red header (no glare / orbs)
-  const headerH = 160;
+  // Flat solid red header (covers watermark in header zone)
+  const headerH = 140;
   ctx.fillStyle = RED;
   ctx.fillRect(0, 0, W, headerH);
 
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
-  ctx.font = "800 40px system-ui, -apple-system, Segoe UI, sans-serif";
-  ctx.fillText("MADADGAAR", W / 2, 72);
+  ctx.font = "800 38px system-ui, -apple-system, Segoe UI, sans-serif";
+  ctx.fillText("MADADGAAR", W / 2, 64);
 
-  ctx.font = "600 20px system-ui, -apple-system, Segoe UI, sans-serif";
+  ctx.font = "600 18px system-ui, -apple-system, Segoe UI, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.fillText("Partner Profile", W / 2, 112);
+  ctx.fillText("Partner Profile", W / 2, 100);
 
-  // Partner logo — large square, clearly visible
-  const logoSize = 168;
+  // Partner logo
+  const logoSize = 132;
   const logoX = (W - logoSize) / 2;
-  const logoY = headerH + 48;
+  const logoY = headerH + 32;
 
   ctx.save();
-  roundRect(ctx, logoX - 6, logoY - 6, logoSize + 12, logoSize + 12, 28);
+  roundRect(ctx, logoX - 4, logoY - 4, logoSize + 8, logoSize + 8, 24);
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.1)";
-  ctx.shadowBlur = 16;
-  ctx.shadowOffsetY = 4;
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 3;
   ctx.fill();
   ctx.restore();
 
   ctx.save();
-  roundRect(ctx, logoX, logoY, logoSize, logoSize, 22);
+  roundRect(ctx, logoX, logoY, logoSize, logoSize, 20);
   ctx.clip();
 
   const pic = await loadImageSafe(profilePic);
@@ -186,7 +230,7 @@ export async function createPartnerProfileQrCard(opts) {
     ctx.fillStyle = RED;
     ctx.fillRect(logoX, logoY, logoSize, logoSize);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "800 72px system-ui, sans-serif";
+    ctx.font = "800 64px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(displayName.charAt(0).toUpperCase(), W / 2, logoY + logoSize / 2);
@@ -194,39 +238,67 @@ export async function createPartnerProfileQrCard(opts) {
   }
   ctx.restore();
 
-  // Border around logo
   ctx.save();
-  roundRect(ctx, logoX, logoY, logoSize, logoSize, 22);
+  roundRect(ctx, logoX, logoY, logoSize, logoSize, 20);
   ctx.strokeStyle = "rgba(183,36,42,0.25)";
   ctx.lineWidth = 3;
   ctx.stroke();
   ctx.restore();
 
-  // Company name — bold and large
-  let y = logoY + logoSize + 56;
-  ctx.textAlign = "center";
-  ctx.fillStyle = INK;
-  ctx.font = "800 44px system-ui, -apple-system, Segoe UI, sans-serif";
-  y = drawWrappedBold(ctx, displayName, W / 2, y, W - 100, 52, 2);
-  y += 36;
+  // Company name — larger / bolder + green verified tick
+  let y = logoY + logoSize + 52;
+  const tickSize = 48;
+  const gap = 16;
+  const nameMaxW = W - 90 - (isVerified ? tickSize + gap : 0);
 
-  if (isVerified || partnerType) {
-    const bits = [];
-    if (isVerified) bits.push("Verified Partner");
-    if (partnerType) bits.push(partnerType);
-    ctx.fillStyle = MUTED;
-    ctx.font = "600 18px system-ui, sans-serif";
-    ctx.fillText(fitText(ctx, bits.join("  ·  "), W - 120, 56), W / 2, y);
-    y += 28;
+  ctx.font = "900 56px system-ui, -apple-system, Segoe UI, Arial Black, sans-serif";
+  ctx.fillStyle = INK;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  const nameLines = wrapLines(ctx, displayName, nameMaxW, 2);
+  const lineH = 64;
+  const blockW = Math.max(
+    ...nameLines.map((ln) => ctx.measureText(ln).width),
+    0
+  );
+  const totalW = blockW + (isVerified ? gap + tickSize : 0);
+  const startX = (W - totalW) / 2;
+
+  nameLines.forEach((ln, i) => {
+    // Soft shadow so name stays readable over watermark
+    ctx.fillStyle = "rgba(0,0,0,0.08)";
+    ctx.fillText(ln, startX + 2, y + i * lineH + 2);
+    ctx.fillStyle = INK;
+    ctx.fillText(ln, startX, y + i * lineH);
+  });
+
+  if (isVerified && nameLines.length) {
+    const lastIdx = nameLines.length - 1;
+    const lastW = ctx.measureText(nameLines[lastIdx]).width;
+    const tickCx = startX + lastW + gap + tickSize / 2;
+    const tickCy = y + lastIdx * lineH - 18;
+    drawVerifiedTick(ctx, tickCx, tickCy, tickSize);
   }
 
-  // QR code
-  const qrSize = 380;
-  const qrX = (W - qrSize) / 2;
-  const qrY = y + 20;
+  y += Math.max(nameLines.length, 1) * lineH + 6;
 
+  if (partnerType) {
+    ctx.textAlign = "center";
+    ctx.fillStyle = MUTED;
+    ctx.font = "600 18px system-ui, sans-serif";
+    ctx.fillText(partnerType, W / 2, y);
+    y += 24;
+  }
+
+  // Large QR for easy scan + Madadgaar logo in center
+  const qrSize = 520;
+  const qrX = (W - qrSize) / 2;
+  const qrY = y + 14;
+
+  // Opaque white pad so watermark never sits under the QR scan area
   ctx.save();
-  roundRect(ctx, qrX - 18, qrY - 18, qrSize + 36, qrSize + 36, 24);
+  roundRect(ctx, qrX - 14, qrY - 14, qrSize + 28, qrSize + 28, 22);
   ctx.fillStyle = "#ffffff";
   ctx.strokeStyle = "rgba(22,22,24,0.1)";
   ctx.lineWidth = 2;
@@ -235,30 +307,82 @@ export async function createPartnerProfileQrCard(opts) {
   ctx.restore();
 
   const qrRaw = await QRCode.toDataURL(publicUrl, {
-    width: 720,
+    width: 1000,
     margin: 1,
-    errorCorrectionLevel: "M",
+    errorCorrectionLevel: "H",
     color: { dark: INK, light: "#ffffff" },
   });
   const qrImg = await loadImage(qrRaw, { crossOrigin: false });
   ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-  // Footer
-  const footerY = qrY + qrSize + 48;
+  // Madadgaar logo badge centered on QR
+  const badge = 96;
+  const bx = W / 2 - badge / 2;
+  const by = qrY + qrSize / 2 - badge / 2;
+
+  ctx.save();
+  roundRect(ctx, bx - 4, by - 4, badge + 8, badge + 8, 20);
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = "rgba(0,0,0,0.14)";
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  roundRect(ctx, bx, by, badge, badge, 16);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(183,36,42,0.22)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  const brandLogo = await loadImageSafe(MADADGAAR_LOGO);
+  if (brandLogo) {
+    const inset = 10;
+    ctx.save();
+    roundRect(ctx, bx + inset, by + inset, badge - inset * 2, badge - inset * 2, 12);
+    ctx.clip();
+    const iw = badge - inset * 2;
+    const scale = Math.max(iw / brandLogo.width, iw / brandLogo.height);
+    const dw = brandLogo.width * scale;
+    const dh = brandLogo.height * scale;
+    ctx.drawImage(
+      brandLogo,
+      bx + inset + (iw - dw) / 2,
+      by + inset + (iw - dh) / 2,
+      dw,
+      dh
+    );
+    ctx.restore();
+  } else {
+    ctx.fillStyle = RED;
+    ctx.font = "800 34px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("M", W / 2, by + badge / 2);
+    ctx.textBaseline = "alphabetic";
+  }
+
+  // Footer — bold “Trusted with Madadgaar”
+  const footerY = qrY + qrSize + 52;
   ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+
+  // Soft backdrop so it stays readable over watermark
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  roundRect(ctx, 48, footerY - 36, W - 96, 78, 16);
+  ctx.fill();
+
   ctx.fillStyle = RED;
-  ctx.font = "700 22px system-ui, -apple-system, Segoe UI, sans-serif";
+  ctx.font = "900 32px system-ui, -apple-system, Segoe UI, Arial Black, sans-serif";
   ctx.fillText("Trusted with Madadgaar", W / 2, footerY);
 
-  ctx.fillStyle = INK;
-  ctx.font = "700 20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-  ctx.fillText(fitText(ctx, pathLabel, W - 80, 64), W / 2, footerY + 40);
-
   ctx.fillStyle = MUTED;
-  ctx.font = "500 16px system-ui, sans-serif";
-  ctx.fillText("Scan to open this partner profile", W / 2, footerY + 72);
+  ctx.font = "600 16px system-ui, sans-serif";
+  ctx.fillText("Scan to open this partner profile", W / 2, footerY + 30);
 
-  // Bottom accent bar — solid red
+  // Bottom accent bar
   ctx.fillStyle = RED;
   ctx.fillRect(0, H - 16, W, 16);
 

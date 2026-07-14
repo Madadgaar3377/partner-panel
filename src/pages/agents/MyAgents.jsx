@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Users, UserPlus, Trash2, Mail, Phone, MapPin } from 'lucide-react';
+import { Users, UserPlus, Trash2, Mail, Phone, MapPin, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
+import ExportRecordsModal from '../../components/mada-data/ExportRecordsModal';
 import baseApi from '../../constants/apiUrl';
 
 const MyAgents = () => {
@@ -10,6 +11,7 @@ const MyAgents = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [removing, setRemoving] = useState(null);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const fetchMyAgents = async () => {
     try {
@@ -78,6 +80,15 @@ const MyAgents = () => {
             </p>
             <p className="text-sm text-gray-500 mt-1">You can add as many agents as you need  no limit.</p>
           </div>
+          <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setShowExportModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl hover:bg-red-50 shadow-sm transition-colors"
+          >
+            <Download className="w-5 h-5" />
+            Download agents
+          </button>
           <button
             onClick={() => navigate('/agents/add')}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 shadow-md transition-colors"
@@ -85,6 +96,7 @@ const MyAgents = () => {
             <UserPlus className="w-5 h-5" />
             Add more agents
           </button>
+          </div>
         </div>
 
         {loading ? (
@@ -144,6 +156,13 @@ const MyAgents = () => {
           </div>
         )}
       </div>
+
+      {showExportModal && (
+        <ExportRecordsModal
+          defaultExportType="agents"
+          onClose={() => setShowExportModal(false)}
+        />
+      )}
     </div>
   );
 };

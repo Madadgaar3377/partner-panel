@@ -22,6 +22,21 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+function drawImageContain(ctx, image, x, y, width, height, padding = 0) {
+  const availableWidth = Math.max(1, width - padding * 2);
+  const availableHeight = Math.max(1, height - padding * 2);
+  const scale = Math.min(availableWidth / image.width, availableHeight / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  ctx.drawImage(
+    image,
+    x + (width - drawWidth) / 2,
+    y + (height - drawHeight) / 2,
+    drawWidth,
+    drawHeight
+  );
+}
+
 function loadImage(src, { crossOrigin = true } = {}) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -213,19 +228,12 @@ export async function createPartnerProfileQrCard(opts) {
   ctx.save();
   roundRect(ctx, logoX, logoY, logoSize, logoSize, 20);
   ctx.clip();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(logoX, logoY, logoSize, logoSize);
 
   const pic = await loadImageSafe(profilePic);
   if (pic) {
-    const scale = Math.max(logoSize / pic.width, logoSize / pic.height);
-    const dw = pic.width * scale;
-    const dh = pic.height * scale;
-    ctx.drawImage(
-      pic,
-      logoX + (logoSize - dw) / 2,
-      logoY + (logoSize - dh) / 2,
-      dw,
-      dh
-    );
+    drawImageContain(ctx, pic, logoX, logoY, logoSize, logoSize, 10);
   } else {
     ctx.fillStyle = RED;
     ctx.fillRect(logoX, logoY, logoSize, logoSize);
@@ -344,16 +352,9 @@ export async function createPartnerProfileQrCard(opts) {
     roundRect(ctx, bx + inset, by + inset, badge - inset * 2, badge - inset * 2, 12);
     ctx.clip();
     const iw = badge - inset * 2;
-    const scale = Math.max(iw / brandLogo.width, iw / brandLogo.height);
-    const dw = brandLogo.width * scale;
-    const dh = brandLogo.height * scale;
-    ctx.drawImage(
-      brandLogo,
-      bx + inset + (iw - dw) / 2,
-      by + inset + (iw - dh) / 2,
-      dw,
-      dh
-    );
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(bx + inset, by + inset, iw, iw);
+    drawImageContain(ctx, brandLogo, bx + inset, by + inset, iw, iw, 2);
     ctx.restore();
   } else {
     ctx.fillStyle = RED;

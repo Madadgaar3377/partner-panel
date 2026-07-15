@@ -3,7 +3,7 @@ import baseApi from '../constants/apiUrl';
 import { parseInstallmentCities } from '../constants/cites';
 import { normalizeApprovalStatus, normalizeStockStatus } from './installmentStatus';
 
-/** Whole PKR amounts — avoids 39999 → 39997 float drift */
+/** Whole PKR amounts  avoids 39999 → 39997 float drift */
 export const roundPKR = (value) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;

@@ -56,7 +56,7 @@ const ExportRecordsModal = ({ onClose, token: tokenProp, defaultExportType = 'in
         if (job.status === 'completed') {
           clearInterval(interval);
           setLoading(false);
-          setStatus('Export ready — downloading…');
+          setStatus('Export ready  downloading…');
           if (job.hasDownload) {
             await downloadJobFile(token, jobId, `madadgaar-${exportType}-export.xlsx`);
             setStatus('Download complete (file removed from server storage)');

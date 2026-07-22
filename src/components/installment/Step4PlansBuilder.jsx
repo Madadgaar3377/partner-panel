@@ -5,6 +5,7 @@ import {
   deletePartnerPaymentPlanApi,
   deriveProductPrice,
   getVariantEffectivePrice,
+  normalizeComposerVariantIndex,
   recalculatePaymentPlan,
 } from '../../utils/installmentPartnerPlans';
 import { PlanFinanceSection } from './InstallmentFinanceUI';
@@ -56,14 +57,19 @@ function PlanComposerForm({ plan, form, onUpdate, editingIndex }) {
     [plan, onUpdate]
   );
 
-  const financedAmount = Math.max(
-    0,
-    (plan.variantIndex !== null &&
-    plan.variantIndex !== undefined &&
-    form.variants?.[plan.variantIndex]
-      ? getVariantEffectivePrice(form.variants[plan.variantIndex])
-      : deriveProductPrice(form.variants, form.price, form)) - (Number(plan.downPayment) || 0)
-  );
+  const financedAmount =
+    plan.financedAmount != null
+      ? Number(plan.financedAmount)
+      : Math.max(
+          0,
+          (plan.cashPrice ||
+            (plan.variantIndex !== null &&
+            plan.variantIndex !== undefined &&
+            form.variants?.[plan.variantIndex]
+              ? getVariantEffectivePrice(form.variants[plan.variantIndex])
+              : deriveProductPrice(form.variants, form.price, form))) -
+            (Number(plan.downPayment) || 0)
+        );
 
   return (
     <div className="space-y-5">
@@ -72,7 +78,7 @@ function PlanComposerForm({ plan, form, onUpdate, editingIndex }) {
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide">Applies To Variant</label>
             <select
-              value={plan.variantIndex ?? ''}
+              value={String(normalizeComposerVariantIndex(plan, form) ?? 0)}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
                 if (!Number.isNaN(v)) onUpdate({ ...plan, variantIndex: v });
@@ -181,6 +187,11 @@ function PlanComposerForm({ plan, form, onUpdate, editingIndex }) {
             </div>
           ))}
         </div>
+        {plan.interestType === 'Profit-Based (Islamic/Shariah)' ? (
+          <p className="text-[11px] text-gray-500 mt-2">
+            Islamic: Total Payable = Financed + Markup · Monthly = Total Payable ÷ Months · Customer Cost = Cash + Markup · Rate = Markup ÷ Cash × 100
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -325,6 +336,16 @@ export function Step4PlansBuilder({
     setDraftPlan((prev) => recalculatePaymentPlan(prev, form));
   }, [form.price, form.variants, form.discountedPrice, form.discountPercent]);
 
+  // When variants are added after draft init, bind a real variantIndex (select looked selected but value was null)
+  useEffect(() => {
+    if (!form.variants?.length) return;
+    setDraftPlan((prev) => {
+      const nextIdx = normalizeComposerVariantIndex(prev, form);
+      if (prev.variantIndex === nextIdx) return prev;
+      return recalculatePaymentPlan({ ...prev, variantIndex: nextIdx }, form);
+    });
+  }, [form.variants?.length]);
+
   useEffect(() => {
     if (!form.paymentPlans?.length) return;
     setForm((f) => {
@@ -334,7 +355,9 @@ export function Step4PlansBuilder({
         return (
           prev.monthlyInstallment === p.monthlyInstallment &&
           prev.installmentPrice === p.installmentPrice &&
-          prev.markup === p.markup
+          prev.markup === p.markup &&
+          prev.interestRatePercent === p.interestRatePercent &&
+          prev.variantIndex === p.variantIndex
         );
       });
       return unchanged ? f : { ...f, paymentPlans: pp };
@@ -368,8 +391,8 @@ export function Step4PlansBuilder({
       return false;
     }
     if (form.variants?.length > 0) {
-      const vIdx = draftPlan.variantIndex;
-      if (vIdx === null || vIdx === undefined || vIdx === '' || Number.isNaN(Number(vIdx))) {
+      const vIdx = normalizeComposerVariantIndex(draftPlan, form);
+      if (vIdx === null) {
         alert('Please select a variant for this plan.');
         return false;
       }
@@ -396,7 +419,7 @@ export function Step4PlansBuilder({
       return { ...f, paymentPlans: pp };
     });
 
-    setDraftPlan(freshDraft(form.variants));
+    setDraftPlan(recalculatePaymentPlan(freshDraft(form.variants), form));
     setEditingIndex(null);
   };
 
@@ -409,7 +432,7 @@ export function Step4PlansBuilder({
   };
 
   const handleCancelEdit = () => {
-    setDraftPlan(freshDraft(form.variants));
+    setDraftPlan(recalculatePaymentPlan(freshDraft(form.variants), form));
     setEditingIndex(null);
   };
 

@@ -128,14 +128,15 @@ const EditInstallmentPlan = () => {
             setForm((prev) => ({ ...prev, ...formData }));
 
             const validPlans = filterValidPaymentPlans(formData.paymentPlans || []);
-            const hasCashPrice =
-              roundPKR(formData.price) > 0 ||
-              (formData.variants || []).some((v) => roundPKR(v.price) > 0);
-            if (!validPlans.length && hasCashPrice) {
+            // Use stored product prices (not hydrated calc fields) to pick save mode
+            const storedHasCash =
+              roundPKR(plan.price) > 0 ||
+              (plan.variants || []).some((v) => roundPKR(v.price) > 0);
+            if (!validPlans.length && storedHasCash) {
               setStep4SaveMode(STEP4_SAVE_MODES.CASH);
-            } else if (validPlans.length && !hasCashPrice) {
+            } else if (validPlans.length && !storedHasCash) {
               setStep4SaveMode(STEP4_SAVE_MODES.INSTALLMENTS_ONLY);
-            } else if (validPlans.length && hasCashPrice) {
+            } else if (validPlans.length && storedHasCash) {
               setStep4SaveMode(STEP4_SAVE_MODES.CASH_INSTALLMENTS);
             }
           } else {
@@ -1154,11 +1155,30 @@ const InputField = ({ label, value, onChange, type = "text", placeholder = "", r
 const VariantPricingFields = ({ variant, onUpdate, calcOnly = false, compact = false }) => {
   const cashLabel = calcOnly ? "Cash Price (calc) *" : "Cash Price (₨) *";
   const discLabel = calcOnly ? "Discounted Price (calc)" : "Discounted Price (₨)";
+  const lastCash = Number(variant.lastPlanCashPrice) || 0;
+  const listing = variant.listingPrice != null ? Number(variant.listingPrice) : 0;
+  const hint = (
+    <div className="space-y-0.5 mt-1">
+      {lastCash > 0 ? (
+        <p className="text-[11px] text-gray-500">
+          Last saved calc: <span className="font-semibold text-gray-700">₨ {lastCash.toLocaleString()}</span>
+        </p>
+      ) : null}
+      {listing > 0 && listing !== lastCash ? (
+        <p className="text-[11px] text-blue-600">
+          Catalog list price: ₨ {listing.toLocaleString()}
+        </p>
+      ) : null}
+    </div>
+  );
 
   if (compact) {
     return (
       <>
-        <InputField label={cashLabel} type="number" value={variant.price} onChange={(v) => onUpdate("price", v)} />
+        <div>
+          <InputField label={cashLabel} type="number" value={variant.price} onChange={(v) => onUpdate("price", v)} />
+          {hint}
+        </div>
         <InputField label={discLabel} type="number" value={variant.discountedPrice ?? ""} onChange={(v) => onUpdate("discountedPrice", v)} placeholder="Same as cash if no discount" />
         <InputField label="Discount % (auto)" type="number" value={variant.discountPercent ?? 0} readOnly />
         <div className="flex flex-col justify-end">
@@ -1171,7 +1191,10 @@ const VariantPricingFields = ({ variant, onUpdate, calcOnly = false, compact = f
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <InputField label={cashLabel} type="number" value={variant.price} onChange={(v) => onUpdate("price", v)} />
+      <div>
+        <InputField label={cashLabel} type="number" value={variant.price} onChange={(v) => onUpdate("price", v)} />
+        {hint}
+      </div>
       <InputField label={discLabel} type="number" value={variant.discountedPrice ?? ""} onChange={(v) => onUpdate("discountedPrice", v)} placeholder="Same as cash if no discount" />
       <InputField label="Discount % (auto)" type="number" value={variant.discountPercent ?? 0} readOnly />
       <div className="flex flex-col justify-end">

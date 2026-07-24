@@ -465,7 +465,7 @@ export const normalizePlansForForm = (plans, variants) =>
 const enrichVariantWithDiscountedPrice = (v) => {
   const price = Number(v?.price) || 0;
   const discounted =
-    v?.discountedPrice !== undefined && v?.discountedPrice !== ""
+    v?.discountedPrice !== undefined && v?.discountedPrice !== "" && Number(v.discountedPrice) > 0
       ? v.discountedPrice
       : price > 0
       ? calcDiscountedPriceFromPercent(price, v?.discountPercent)
@@ -475,6 +475,61 @@ const enrichVariantWithDiscountedPrice = (v) => {
     discountedPrice: discounted,
     discountPercent: v?.discountPercent ?? 0,
   };
+};
+
+/**
+ * Collect last saved calc cash prices from payment plans (installments-only products
+ * store 0 on variant.price but keep cashPrice on each plan).
+ * Map key = product variant index.
+ */
+export const collectVariantCashPricesFromProduct = (product, partnerId = null) => {
+  const map = new Map();
+  const consider = (plan, variantIndex) => {
+    if (!plan) return;
+    if (
+      partnerId &&
+      plan.partnerId &&
+      String(plan.partnerId) !== String(partnerId)
+    ) {
+      return;
+    }
+    const cash = roundPKR(plan.cashPrice);
+    if (cash <= 0) return;
+    const idx =
+      variantIndex !== null && variantIndex !== undefined && variantIndex !== ""
+        ? Number(variantIndex)
+        : Number(plan.variantIndex);
+    if (!Number.isFinite(idx) || idx < 0) return;
+    map.set(idx, cash);
+  };
+
+  (product?.paymentPlans || []).forEach((p) => consider(p, p.variantIndex));
+  (product?.variants || []).forEach((v, i) => {
+    (v.paymentPlans || []).forEach((p) => consider(p, i));
+  });
+  return map;
+};
+
+/** Restore calc cash into variant rows when product price was stripped (installments-only) */
+export const applySavedCalcPricesToVariants = (variants, cashByIndex = new Map()) =>
+  (variants || []).map((v, i) => {
+    const saved = cashByIndex.get(i) || 0;
+    const current = roundPKR(v.price);
+    const price = current > 0 ? current : saved > 0 ? saved : "";
+    return enrichVariantWithDiscountedPrice({
+      ...v,
+      price,
+      lastPlanCashPrice: saved > 0 ? saved : current > 0 ? current : null,
+    });
+  });
+
+/** Hydrate editor variants from product document (edit + attach flows) */
+export const hydrateVariantsForEditor = (product, partnerId, attached) => {
+  const base = attached
+    ? mapProductVariantsForPartner(product, partnerId)
+    : mapVariantsForOwnerEditor(product?.variants);
+  const cashByIndex = collectVariantCashPricesFromProduct(product, partnerId);
+  return applySavedCalcPricesToVariants(base, cashByIndex);
 };
 
 export const mapProductVariantsForPartner = (product, partnerId) => {
@@ -492,7 +547,7 @@ export const mapProductVariantsForPartner = (product, partnerId) => {
       rows.push({
         variantName: v.variantName || `Your variant ${rows.length + 1}`,
         listingPrice: null,
-        price: v.price ?? "",
+        price: roundPKR(v.price) > 0 ? v.price : "",
         discountPercent: v.discountPercent ?? 0,
         isCatalogVariant: false,
         isPartnerOwned: true,
@@ -504,10 +559,11 @@ export const mapProductVariantsForPartner = (product, partnerId) => {
     }
 
     const ov = overrides.find((o) => Number(o.variantIndex) === i);
+    const overrideCash = roundPKR(ov?.cashPrice);
     rows.push({
       variantName: v.variantName || `Variant ${i + 1}`,
-      listingPrice: v.price,
-      price: ov?.cashPrice ?? "",
+      listingPrice: roundPKR(v.price) > 0 ? v.price : null,
+      price: overrideCash > 0 ? overrideCash : "",
       discountPercent: ov?.discountPercent ?? 0,
       isCatalogVariant: true,
       isPartnerOwned: false,
@@ -524,7 +580,7 @@ export const mapVariantsForOwnerEditor = (variants) =>
   (variants || []).map((v, i) =>
     enrichVariantWithDiscountedPrice({
       variantName: v.variantName || `Variant ${i + 1}`,
-      price: v.price ?? "",
+      price: roundPKR(v.price) > 0 ? v.price : "",
       discountPercent: v.discountPercent ?? 0,
       status: v.status || "active",
       isCatalogVariant: false,
@@ -543,9 +599,7 @@ export const mapInstallmentPlanToForm = (plan, partnerUserId) => {
   const attached = isAttachedMultiVendor(partnerUserId, ownerId);
   const partnerEntry = getPartnerPricingEntry(plan, partnerUserId);
 
-  const variants = attached
-    ? mapProductVariantsForPartner(plan, partnerUserId)
-    : mapVariantsForOwnerEditor(plan.variants);
+  const variants = hydrateVariantsForEditor(plan, partnerUserId, attached);
 
   const rawPlans = flattenEditorPaymentPlans(plan, partnerUserId, ownerId);
   const paymentPlans = normalizePlansForForm(rawPlans, variants);
@@ -556,10 +610,15 @@ export const mapInstallmentPlanToForm = (plan, partnerUserId) => {
     category = "other";
   }
 
-  const price =
+  let price =
     attached && partnerEntry?.basePrice
       ? partnerEntry.basePrice
       : plan.price ?? "";
+  // Installments-only products often have product.price = 0 — restore from plans/variants
+  if (roundPKR(price) <= 0) {
+    const fromVariants = deriveProductPrice(variants, 0, null);
+    if (fromVariants > 0) price = fromVariants;
+  }
   const discountPercent = attached
     ? 0
     : Number(plan.discountPercent) || 0;
